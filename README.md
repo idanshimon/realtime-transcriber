@@ -38,6 +38,14 @@ The installer:
 	- `Ctrl+E` — copy delta since last `Ctrl+S`
 	- `Ctrl+P` — pause/resume
 
+## Teams browser extension (experimental)
+
+`teams-extension/` is a separate, **work-in-progress** Chrome extension that scrapes Teams web Live Captions directly from the DOM — no audio capture, no AI inference. It produces transcripts with **real speaker names** (since Teams labels them itself) in the same `[HH:MM:SS] Speaker: text` format as the audio pipeline.
+
+**Status:** the `content.js` observer is functional, but `manifest.json` references `background.js`, `popup.html`, and icon assets that aren't bundled yet, so Chrome won't load it as-is. Treat it as a reference implementation until those stubs land.
+
+The audio pipeline (`rtt` / `install.sh`) is the supported path.
+
 ## Manual setup (if you skip `install.sh`)
 1. **Audio routing** — install a virtual loopback device:
    - macOS: [BlackHole](https://existential.audio/blackhole/) + Multi-Output Device
