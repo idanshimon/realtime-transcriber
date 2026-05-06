@@ -35,3 +35,12 @@ transcripts-test.txt
 
 # Copilot instructions (optional, keep local)
 copilot-instructions.md
+
+# Local machine artifacts
+devices.txt
+.stubs/
+.vfsmeta/
+.work-folder-info
+
+# Agent context (keep local — may contain private references)
+AGENTS.md

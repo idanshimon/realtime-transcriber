@@ -33,6 +33,11 @@ else:  # pragma: no cover - runtime import
     except ImportError:
         speechsdk = None  # type: ignore
 
+try:
+    from azure.identity import DefaultAzureCredential
+except ImportError:
+    DefaultAzureCredential = None  # type: ignore
+
 app = typer.Typer(add_completion=False, help="Stream live audio into local or Azure speech recognizers.")
 
 BACKEND_LOCAL = "local"
@@ -238,6 +243,7 @@ def audio_chunks_from_device(
     samplerate: int,
     block_duration: float,
     device_index: Optional[int],
+    use_loopback: bool = False,
 ) -> sd.InputStream:
     blocksize = max(256, int(samplerate * block_duration))
 
@@ -248,7 +254,7 @@ def audio_chunks_from_device(
             return
         capture_queue.put(indata.copy())
 
-    stream = sd.InputStream(
+    stream_kwargs: dict = dict(
         samplerate=samplerate,
         channels=1,
         dtype="float32",
@@ -256,8 +262,127 @@ def audio_chunks_from_device(
         blocksize=blocksize,
         callback=callback,
     )
+
+    # WASAPI loopback (Windows): captures the OUTPUT of a device as if it were an input.
+    # Lets us record what's playing through the speakers without virtual cables/drivers.
+    if use_loopback:
+        try:
+            stream_kwargs["extra_settings"] = sd.WasapiSettings(loopback=True)
+        except AttributeError:
+            typer.echo(
+                "Warning: WASAPI loopback requested but unavailable on this platform. "
+                "Falling back to direct device capture.",
+                err=True,
+            )
+
+    stream = sd.InputStream(**stream_kwargs)
     stream.start()
     return stream
+
+
+class MixedDeviceCapture:
+    """Captures from a primary device (system audio) and a mic, mixes them in real time.
+
+    Each stream pushes into its own ring buffer. A consumer thread pulls equal-sized
+    blocks from both and sums them (with simple clipping protection) into capture_queue.
+    If one stream falls behind, the other plays through alone for that block, so the
+    transcript never stalls waiting on a silent device.
+    """
+
+    def __init__(
+        self,
+        capture_queue: "queue.Queue[np.ndarray]",
+        stop_event: threading.Event,
+        paused_event: threading.Event,
+        samplerate: int,
+        block_duration: float,
+        primary_device: Optional[int],
+        mic_device: Optional[int],
+        use_loopback: bool = False,
+        mic_gain: float = 1.0,
+    ) -> None:
+        self.capture_queue = capture_queue
+        self.stop_event = stop_event
+        self.paused_event = paused_event
+        self.samplerate = samplerate
+        self.blocksize = max(256, int(samplerate * block_duration))
+        self.mic_gain = mic_gain
+
+        self._primary_buf: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=64)
+        self._mic_buf: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=64)
+
+        primary_kwargs = dict(
+            samplerate=samplerate, channels=1, dtype="float32",
+            device=primary_device, blocksize=self.blocksize,
+            callback=self._make_cb(self._primary_buf),
+        )
+        if use_loopback:
+            try:
+                primary_kwargs["extra_settings"] = sd.WasapiSettings(loopback=True)
+            except AttributeError:
+                typer.echo("Warning: WASAPI loopback unavailable; using direct capture.", err=True)
+
+        self._primary_stream = sd.InputStream(**primary_kwargs)
+        self._mic_stream = sd.InputStream(
+            samplerate=samplerate, channels=1, dtype="float32",
+            device=mic_device, blocksize=self.blocksize,
+            callback=self._make_cb(self._mic_buf),
+        )
+
+        self._mixer_thread = threading.Thread(target=self._mixer_loop, daemon=True)
+
+    def _make_cb(self, buf: "queue.Queue[np.ndarray]"):
+        def cb(indata: np.ndarray, frames: int, time_info, status: sd.CallbackFlags) -> None:
+            if status:
+                typer.echo(f"PortAudio status: {status}", err=True)
+            if self.paused_event.is_set():
+                return
+            try:
+                buf.put_nowait(indata.copy())
+            except queue.Full:
+                # Drop oldest block to keep latency bounded.
+                try:
+                    buf.get_nowait()
+                    buf.put_nowait(indata.copy())
+                except queue.Empty:
+                    pass
+        return cb
+
+    def _drain_block(self, buf: "queue.Queue[np.ndarray]") -> Optional[np.ndarray]:
+        try:
+            return buf.get(timeout=0.5)
+        except queue.Empty:
+            return None
+
+    def _mixer_loop(self) -> None:
+        zeros = np.zeros((self.blocksize, 1), dtype=np.float32)
+        while not self.stop_event.is_set():
+            primary = self._drain_block(self._primary_buf)
+            mic = self._drain_block(self._mic_buf)
+            if primary is None and mic is None:
+                continue
+            if primary is None:
+                primary = zeros
+            if mic is None:
+                mic = zeros
+            # Align block lengths defensively
+            n = min(primary.shape[0], mic.shape[0])
+            mixed = primary[:n] + (mic[:n] * self.mic_gain)
+            np.clip(mixed, -1.0, 1.0, out=mixed)
+            self.capture_queue.put(mixed)
+
+    def start(self) -> None:
+        self._primary_stream.start()
+        self._mic_stream.start()
+        self._mixer_thread.start()
+
+    def stop(self) -> None:
+        for s in (self._primary_stream, self._mic_stream):
+            try:
+                s.stop()
+                s.close()
+            except Exception:
+                pass
 
 
 SOUND_FILE_EXTS = {".wav", ".flac", ".ogg", ".oga", ".aiff", ".aif", ".aifc"}
@@ -363,23 +488,56 @@ class LocalWhisperBackend:
 class AzureSpeechBackend:
     def __init__(
         self,
-        key: str,
         region: Optional[str],
         endpoint: Optional[str],
         language: str,
         sample_rate: int,
         enable_speaker_labels: bool,
+        key: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        auto_detect_languages: Optional[List[str]] = None,
     ) -> None:
         if speechsdk is None:
             raise RuntimeError("azure-cognitiveservices-speech is not installed.")
+        if not key and not auth_token:
+            raise ValueError("Azure Speech backend requires either a subscription key or an auth token.")
 
-        if endpoint:
-            speech_config = speechsdk.SpeechConfig(subscription=key, endpoint=endpoint)
+        if key:
+            if endpoint:
+                speech_config = speechsdk.SpeechConfig(subscription=key, endpoint=endpoint)
+            else:
+                if not region:
+                    raise ValueError("Azure Speech backend requires either region or endpoint.")
+                speech_config = speechsdk.SpeechConfig(subscription=key, region=region)
         else:
-            if not region:
-                raise ValueError("Azure Speech backend requires either region or endpoint.")
-            speech_config = speechsdk.SpeechConfig(subscription=key, region=region)
-        speech_config.speech_recognition_language = language
+            if endpoint:
+                speech_config = speechsdk.SpeechConfig(endpoint=endpoint)
+            else:
+                if not region:
+                    raise ValueError("Azure Speech backend requires either region or endpoint.")
+                speech_config = speechsdk.SpeechConfig(auth_token=auth_token, region=region)
+            speech_config.authorization_token = auth_token
+
+        # Language: use auto-detect if multiple languages requested, else single language
+        self._auto_detect_config: Optional[speechsdk.languageconfig.AutoDetectSourceLanguageConfig] = None
+        if auto_detect_languages and len(auto_detect_languages) > 1:
+            self._auto_detect_config = speechsdk.languageconfig.AutoDetectSourceLanguageConfig(
+                languages=auto_detect_languages
+            )
+            # Enable CONTINUOUS language detection (re-detects per segment, not just at start)
+            # This is the key setting for Hebrew/English code-switching mid-sentence
+            try:
+                speech_config.set_property(
+                    property_id=speechsdk.PropertyId.SpeechServiceConnection_LanguageIdMode,
+                    value="Continuous",
+                )
+                typer.echo("Azure language ID mode: Continuous (best for mixed Hebrew/English)", err=True)
+            except AttributeError:
+                # Older SDK versions may not have this PropertyId — falls back to AtStart detection
+                typer.echo("Azure language ID mode: AtStart (upgrade SDK for Continuous mode)", err=True)
+            typer.echo(f"Azure auto-detect languages: {', '.join(auto_detect_languages)}", err=True)
+        else:
+            speech_config.speech_recognition_language = language
         if enable_speaker_labels:
             diarize_property = getattr(
                 speechsdk.PropertyId,
@@ -395,22 +553,37 @@ class AzureSpeechBackend:
         self._conversation_transcriber = None
         self._speech_recognizer = None
         if enable_speaker_labels:
-            self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
-                speech_config=speech_config,
-                audio_config=audio_config,
-            )
+            if self._auto_detect_config:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=speech_config,
+                    audio_config=audio_config,
+                )
             self._conversation_transcriber.transcribed.connect(self._on_transcribed)
             self._conversation_transcriber.canceled.connect(self._on_canceled)
             self._conversation_transcriber.session_stopped.connect(self._on_session_stopped)
             self._conversation_transcriber.session_started.connect(self._on_session_started)
         else:
-            self._speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+            if self._auto_detect_config:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(
+                    speech_config=speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
             self._speech_recognizer.recognized.connect(self._on_recognized)
             self._speech_recognizer.canceled.connect(self._on_canceled)
             self._speech_recognizer.session_stopped.connect(self._on_session_stopped)
             self._speech_recognizer.session_started.connect(self._on_session_started)
         self._text_queue: "queue.Queue[str]" = queue.Queue()
         self._stop_event = threading.Event()
+        self._session_stopped_event = threading.Event()
 
     def _on_session_started(self, evt) -> None:
         session_id = getattr(evt, "session_id", None) or getattr(evt, "sessionId", None)
@@ -454,6 +627,7 @@ class AzureSpeechBackend:
             typer.echo(f"Azure session stopped (id={session_id})", err=True)
         else:
             typer.echo("Azure session stopped", err=True)
+        self._session_stopped_event.set()
 
     def start(self) -> None:
         if self._use_conversation:
@@ -465,13 +639,18 @@ class AzureSpeechBackend:
 
     def stop(self) -> None:
         self._stop_event.set()
+        # Close the push stream to signal end-of-audio, giving Azure a
+        # chance to finalize any pending utterances before we stop the recognizer.
+        try:
+            self.push_stream.close()
+        except Exception:
+            pass  # already closed
         if self._use_conversation:
             assert self._conversation_transcriber is not None
             self._conversation_transcriber.stop_transcribing_async().get()
         else:
             assert self._speech_recognizer is not None
             self._speech_recognizer.stop_continuous_recognition_async().get()
-        self.push_stream.close()
 
     def push_audio(self, audio: np.ndarray) -> None:
         audio = np.squeeze(audio)
@@ -566,11 +745,24 @@ def process_azure_backend(
                 pass
             for line in backend.drain_text():
                 emit(line)
+        # All audio has been pushed. Close the push stream to signal end-of-audio
+        # so Azure can finalize any pending utterances, then keep draining results
+        # until the session fully stops.
+        backend.push_stream.close()
+        while not backend._session_stopped_event.wait(timeout=0.2):
+            for line in backend.drain_text():
+                emit(line)
+        # Final drain after session has stopped
+        for line in backend.drain_text():
+            emit(line)
     except Exception as exc:
         typer.echo(f"Azure backend worker failed: {exc}", err=True)
         stop_event.set()
     finally:
         backend.stop()
+        # Drain any results produced during stop()
+        for line in backend.drain_text():
+            emit(line)
 
 
 def read_file_into_queue(
@@ -625,9 +817,9 @@ def read_file_into_queue(
 
 
 def validate_azure_config(key: Optional[str], region: Optional[str], endpoint: Optional[str]) -> None:
-    if not key or (not region and not endpoint):
+    if not region and not endpoint:
         raise typer.BadParameter(
-            "Azure backend requires AZURE_SPEECH_KEY and either AZURE_SPEECH_REGION or AZURE_SPEECH_ENDPOINT (env or CLI)."
+            "Azure backend requires either AZURE_SPEECH_REGION or AZURE_SPEECH_ENDPOINT (env or CLI)."
         )
 
 
@@ -642,6 +834,26 @@ def main(
         os.environ.get("RTT_INPUT_DEVICE"), "--input-device", help="Device index or name substring."
     ),
     list_devices_flag: bool = typer.Option(False, "--list-devices", help="Only list devices and exit."),
+    use_loopback: bool = typer.Option(
+        os.environ.get("RTT_USE_LOOPBACK", "") == "1",
+        "--loopback/--no-loopback",
+        help="WASAPI loopback (Windows): capture the OUTPUT of --input-device instead of its input. Lets you record system audio with zero virtual-cable setup.",
+    ),
+    include_mic: bool = typer.Option(
+        os.environ.get("RTT_INCLUDE_MIC", "") == "1",
+        "--include-mic/--no-include-mic",
+        help="Mix the microphone into the captured audio so your own voice appears in the transcript. Honors RTT_INCLUDE_MIC=1.",
+    ),
+    mic_device: Optional[str] = typer.Option(
+        os.environ.get("RTT_MIC_DEVICE"),
+        "--mic-device",
+        help="Mic device name/index for --include-mic. Defaults to the system default input.",
+    ),
+    mic_gain: float = typer.Option(
+        float(os.environ.get("RTT_MIC_GAIN", "1.0")),
+        "--mic-gain",
+        help="Gain applied to the mic before mixing (0.0–2.0 sensible range).",
+    ),
     sample_rate: int = typer.Option(16000, "--sample-rate", help="Capture sample rate (Hz)."),
     block_duration: float = typer.Option(0.5, "--block-duration", help="Capture block size in seconds."),
     window_seconds: float = typer.Option(2.5, "--window", help="Whisper window size in seconds."),
@@ -652,10 +864,16 @@ def main(
     azure_key: Optional[str] = typer.Option(None, "--azure-key", help="Override AZURE_SPEECH_KEY."),
     azure_region: Optional[str] = typer.Option(None, "--azure-region", help="Override AZURE_SPEECH_REGION."),
     azure_endpoint: Optional[str] = typer.Option(None, "--azure-endpoint", help="Override AZURE_SPEECH_ENDPOINT."),
+    azure_resource_id: Optional[str] = typer.Option(None, "--azure-resource-id", help="Override AZURE_SPEECH_RESOURCE_ID (required for Azure AD auth)."),
     azure_speaker_labels: bool = typer.Option(
         False,
         "--azure-speaker-labels/--no-azure-speaker-labels",
         help="Enable Azure Conversation Transcriber speaker diarization (Azure backend only).",
+    ),
+    azure_languages: Optional[str] = typer.Option(
+        None,
+        "--azure-languages",
+        help="Comma-separated language codes for auto-detection, e.g. 'en-US,he-IL'. Overrides --language for Azure backend.",
     ),
 ) -> None:
     if list_devices_flag:
@@ -709,9 +927,22 @@ def main(
             capture_thread.start()
         else:
             device_index = resolve_device(input_device)
-            stream = audio_chunks_from_device(
-                audio_queue, stop_event, paused_event, sample_rate, block_duration, device_index
-            )
+            if include_mic:
+                mic_index = resolve_device(mic_device) if mic_device else None
+                primary_name = sd.query_devices(device_index)["name"] if device_index is not None else "system default"
+                mic_name = sd.query_devices(mic_index)["name"] if mic_index is not None else "system default"
+                typer.echo(f"🎙️  Mixing: capture=[{primary_name}] + mic=[{mic_name}] (gain={mic_gain})")
+                mixer = MixedDeviceCapture(
+                    audio_queue, stop_event, paused_event, sample_rate, block_duration,
+                    primary_device=device_index, mic_device=mic_index,
+                    use_loopback=use_loopback, mic_gain=mic_gain,
+                )
+                mixer.start()
+                stream = mixer  # has .stop() interface used during cleanup
+            else:
+                stream = audio_chunks_from_device(
+                    audio_queue, stop_event, paused_event, sample_rate, block_duration, device_index, use_loopback=use_loopback
+                )
 
         if backend == BACKEND_LOCAL:
             typer.echo(f"Starting local Whisper backend ({model_size})")
@@ -726,16 +957,44 @@ def main(
             region = azure_region or os.environ.get("AZURE_SPEECH_REGION")
             endpoint = azure_endpoint or os.environ.get("AZURE_SPEECH_ENDPOINT")
             validate_azure_config(key, region, endpoint)
-            assert key is not None
+
+            auth_token = None
+            if not key:
+                if DefaultAzureCredential is None:
+                    raise typer.BadParameter(
+                        "No AZURE_SPEECH_KEY set and azure-identity is not installed. "
+                        "Install it with: pip install azure-identity"
+                    )
+                resource_id = azure_resource_id or os.environ.get("AZURE_SPEECH_RESOURCE_ID")
+                if not resource_id:
+                    raise typer.BadParameter(
+                        "Azure AD auth requires AZURE_SPEECH_RESOURCE_ID (the full ARM resource ID). "
+                        "Set it in .env or pass --azure-resource-id."
+                    )
+                typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
+                try:
+                    credential = DefaultAzureCredential()
+                    token = credential.get_token("https://cognitiveservices.azure.com/.default")
+                    auth_token = f"aad#{resource_id}#{token.token}"
+                except Exception as exc:
+                    typer.echo(f"Azure AD authentication failed: {exc}", err=True)
+                    raise typer.Exit(code=1)
+                typer.echo("Azure AD token acquired successfully.")
+
             typer.echo("Starting Azure Speech backend")
+            auto_detect_langs: Optional[List[str]] = None
+            if azure_languages:
+                auto_detect_langs = [l.strip() for l in azure_languages.split(",") if l.strip()]
             try:
                 azure_backend = AzureSpeechBackend(
-                    key,
                     region,
                     endpoint,
                     language or "en-US",
                     sample_rate,
                     azure_speaker_labels,
+                    key=key,
+                    auth_token=auth_token,
+                    auto_detect_languages=auto_detect_langs,
                 )
             except Exception as exc:
                 typer.echo(f"Failed to initialize Azure Speech backend: {exc}", err=True)
@@ -753,8 +1012,16 @@ def main(
     finally:
         stop_event.set()
         if stream is not None:
-            stream.stop()
-            stream.close()
+            try:
+                stream.stop()
+            except Exception:
+                pass
+            close = getattr(stream, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
         if capture_thread and capture_thread.is_alive():
             capture_thread.join(timeout=1)
         hotkey_listener.join(timeout=1)
