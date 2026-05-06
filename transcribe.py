@@ -57,25 +57,76 @@ class TranscriptBuffer:
         # Index into `_lines` used for Ctrl+E delta copies (since last Ctrl+S).
         # Starts at 0 so Ctrl+E before the first Ctrl+S returns the full transcript.
         self._delta_baseline: int = 0
+        # Speaker rename map: "Guest-1" -> "Hawk Ticehurst". Applied at write/render time.
+        self._speaker_map: dict = {}
         if file_path:
             file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _apply_speaker_map(self, line: str) -> str:
+        if not self._speaker_map:
+            return line
+        out = line
+        for src, dst in self._speaker_map.items():
+            # Match "Speaker Guest-2:" or "Speaker Guest-2 " patterns.
+            out = out.replace(f"Speaker {src}:", f"Speaker {dst}:")
+            out = out.replace(f"Speaker {src} ", f"Speaker {dst} ")
+        return out
 
     def add(self, line: str) -> None:
         with self._lock:
             self._lines.append(line)
             if self._file_path:
                 with self._file_path.open("a", encoding="utf-8") as handle:
-                    handle.write(line + "\n")
+                    handle.write(self._apply_speaker_map(line) + "\n")
+
+    def known_speakers(self) -> List[str]:
+        """Return distinct speaker labels seen so far (e.g. ['Guest-1', 'Guest-2'])."""
+        speakers: List[str] = []
+        seen = set()
+        with self._lock:
+            for ln in self._lines:
+                # Format: "[HH:MM:SS] Speaker XXX: text"
+                idx = ln.find("Speaker ")
+                if idx < 0:
+                    continue
+                tail = ln[idx + len("Speaker "):]
+                colon = tail.find(":")
+                if colon < 0:
+                    continue
+                name = tail[:colon].strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    speakers.append(name)
+        return speakers
+
+    def rename_speaker(self, src: str, dst: str) -> int:
+        """Map src->dst going forward AND rewrite the file with substitutions applied.
+        Returns the number of past lines updated."""
+        if not src or not dst:
+            return 0
+        with self._lock:
+            self._speaker_map[src] = dst
+            updated = 0
+            for ln in self._lines:
+                if f"Speaker {src}:" in ln or f"Speaker {src} " in ln:
+                    updated += 1
+            if self._file_path and self._file_path.exists():
+                rendered = [self._apply_speaker_map(ln) for ln in self._lines]
+                # Rewrite atomically.
+                tmp = self._file_path.with_suffix(self._file_path.suffix + ".tmp")
+                tmp.write_text("\n".join(rendered) + ("\n" if rendered else ""), encoding="utf-8")
+                tmp.replace(self._file_path)
+            return updated
 
     def snapshot(self) -> str:
         with self._lock:
-            return "\n".join(self._lines)
+            return "\n".join(self._apply_speaker_map(ln) for ln in self._lines)
 
     def _delta_snapshot_locked(self) -> str:
         baseline = max(0, min(self._delta_baseline, len(self._lines)))
         if baseline >= len(self._lines):
             return ""
-        return "\n".join(self._lines[baseline:])
+        return "\n".join(self._apply_speaker_map(ln) for ln in self._lines[baseline:])
 
     def copy_full_to_clipboard(self) -> None:
         text = self.snapshot()
@@ -126,6 +177,57 @@ class ClipboardHotkeyListener(threading.Thread):
         else:
             self._run_posix()
 
+    def _prompt_rename(self) -> None:
+        """Pause raw-mode input, prompt user for src=dst, apply, resume."""
+        speakers = self._buffer.known_speakers()
+        is_windows = os.name == "nt"
+        # Restore canonical mode on POSIX so input() works normally.
+        if not is_windows and self._orig_termios is not None:
+            try:
+                import termios
+                termios.tcsetattr(self._stdin_fd, termios.TCSANOW, self._orig_termios)
+            except Exception:
+                pass
+        try:
+            sys.stdout.write("\n\u270f\ufe0f  Rename speaker. ")
+            if speakers:
+                sys.stdout.write(f"Known: {', '.join(speakers)}\n")
+            else:
+                sys.stdout.write("(No speakers labeled yet.)\n")
+            sys.stdout.write('src=dst (e.g. "Guest-2=Hawk Ticehurst") or blank to cancel: ')
+            sys.stdout.flush()
+            try:
+                raw = sys.stdin.readline().rstrip("\n")
+            except (EOFError, KeyboardInterrupt):
+                raw = ""
+            if not raw.strip():
+                typer.echo("Rename cancelled.")
+                return
+            if "=" not in raw:
+                typer.echo("\u26a0\ufe0f  Invalid format. Use src=dst (e.g. Guest-2=Hawk Ticehurst).", err=True)
+                return
+            src, _, dst = raw.partition("=")
+            src = src.strip()
+            dst = dst.strip()
+            if not src or not dst:
+                typer.echo("\u26a0\ufe0f  Both src and dst are required.", err=True)
+                return
+            if speakers and src not in speakers:
+                typer.echo(f"\u26a0\ufe0f  '{src}' not in known speakers ({', '.join(speakers)}). Mapping anyway.")
+            count = self._buffer.rename_speaker(src, dst)
+            typer.echo(f"\u2705 Renamed {src} \u2192 {dst} ({count} past lines updated, future lines auto-mapped).")
+        finally:
+            # Re-enter raw mode on POSIX.
+            if not is_windows and self._orig_termios is not None:
+                try:
+                    import termios
+                    new_attrs = termios.tcgetattr(self._stdin_fd)
+                    new_attrs[3] &= ~(termios.ECHO | termios.ICANON)
+                    new_attrs[0] &= ~termios.IXON
+                    termios.tcsetattr(self._stdin_fd, termios.TCSANOW, new_attrs)
+                except Exception:
+                    pass
+
     def _run_windows(self) -> None:
         try:
             import msvcrt  # type: ignore
@@ -146,6 +248,8 @@ class ClipboardHotkeyListener(threading.Thread):
                     else:
                         self._paused_event.set()
                         typer.echo("Transcription paused (Ctrl+P).")
+                elif ch == "\x12":  # Ctrl+R
+                    self._prompt_rename()
             time.sleep(0.05)
 
     def _run_posix(self) -> None:
@@ -182,6 +286,8 @@ class ClipboardHotkeyListener(threading.Thread):
                         else:
                             self._paused_event.set()
                             typer.echo("Transcription paused (Ctrl+P).")
+                    elif ch == b"\x12":  # Ctrl+R
+                        self._prompt_rename()
         finally:
             if self._orig_termios is not None:
                 termios.tcsetattr(self._stdin_fd, termios.TCSANOW, self._orig_termios)
