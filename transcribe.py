@@ -602,6 +602,7 @@ class AzureSpeechBackend:
         key: Optional[str] = None,
         auth_token: Optional[str] = None,
         auto_detect_languages: Optional[List[str]] = None,
+        token_provider=None,
     ) -> None:
         if speechsdk is None:
             raise RuntimeError("azure-cognitiveservices-speech is not installed.")
@@ -652,44 +653,29 @@ class AzureSpeechBackend:
             )
             if diarize_property is not None:
                 speech_config.set_property(property_id=diarize_property, value="true")
-        stream_format = speechsdk.audio.AudioStreamFormat(samples_per_second=sample_rate, bits_per_sample=16, channels=1)
-        self.push_stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
-        audio_config = speechsdk.audio.AudioConfig(stream=self.push_stream)
+        self._enable_speaker_labels = enable_speaker_labels
         self._use_conversation = enable_speaker_labels
         self._conversation_transcriber = None
         self._speech_recognizer = None
-        if enable_speaker_labels:
-            if self._auto_detect_config:
-                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                    auto_detect_source_language_config=self._auto_detect_config,
-                )
-            else:
-                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                )
-            self._conversation_transcriber.transcribed.connect(self._on_transcribed)
-            self._conversation_transcriber.canceled.connect(self._on_canceled)
-            self._conversation_transcriber.session_stopped.connect(self._on_session_stopped)
-            self._conversation_transcriber.session_started.connect(self._on_session_started)
-        else:
-            if self._auto_detect_config:
-                self._speech_recognizer = speechsdk.SpeechRecognizer(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                    auto_detect_source_language_config=self._auto_detect_config,
-                )
-            else:
-                self._speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-            self._speech_recognizer.recognized.connect(self._on_recognized)
-            self._speech_recognizer.canceled.connect(self._on_canceled)
-            self._speech_recognizer.session_stopped.connect(self._on_session_stopped)
-            self._speech_recognizer.session_started.connect(self._on_session_started)
+        self._speech_config = speech_config
+        self._token_provider = token_provider
+        self._sample_rate = sample_rate
+        self._build_recognizer()
         self._text_queue: "queue.Queue[str]" = queue.Queue()
         self._stop_event = threading.Event()
         self._session_stopped_event = threading.Event()
+        self._auth_error_event = threading.Event()
+        # --- Token auto-refresh (AAD) ---
+        # AAD tokens expire ~60-90 min. The Speech SDK silently rotates its
+        # WebSocket connection mid-session; if the authorization_token is stale
+        # at that moment the upgrade fails with HTTP 401 and the session is
+        # canceled. We proactively refresh authorization_token on the live
+        # speech_config every few minutes so a fresh token is always present.
+        self._speech_config = speech_config
+        self._token_provider = token_provider
+        self._sample_rate = sample_rate
+        self._refresh_thread: Optional[threading.Thread] = None
+        self._refresh_interval = 540  # seconds (9 min — well under the ~60 min TTL)
 
     def _on_session_started(self, evt) -> None:
         session_id = getattr(evt, "session_id", None) or getattr(evt, "sessionId", None)
@@ -725,6 +711,21 @@ class AzureSpeechBackend:
             except Exception:
                 pass
 
+        # Detect auth/connection failures (e.g. expired AAD token → 401 on
+        # WebSocket upgrade) so the worker loop can transparently re-auth and
+        # resume instead of leaving the session permanently deaf.
+        details_str = str(error_details or "")
+        is_auth_error = (
+            "401" in details_str
+            or "Authentication" in details_str
+            or "Forbidden" in details_str
+            or "403" in details_str
+        )
+        if is_auth_error:
+            self._auth_error_event.set()
+            # Refresh the token immediately so the next start() uses a valid one.
+            self._refresh_token(force=True)
+
         typer.echo(f"Azure canceled (reason={reason}, code={error_code}): {error_details}", err=True)
 
     def _on_session_stopped(self, evt) -> None:
@@ -735,7 +736,126 @@ class AzureSpeechBackend:
             typer.echo("Azure session stopped", err=True)
         self._session_stopped_event.set()
 
+    def _build_recognizer(self) -> None:
+        """(Re)build the push stream + recognizer/transcriber and wire events.
+
+        Called once at init and again by restart() after an auth-error cancel.
+        A PushAudioInputStream cannot be reused after the session is canceled,
+        so we always create a fresh one here."""
+        stream_format = speechsdk.audio.AudioStreamFormat(
+            samples_per_second=self._sample_rate, bits_per_sample=16, channels=1
+        )
+        self.push_stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
+        audio_config = speechsdk.audio.AudioConfig(stream=self.push_stream)
+        self._conversation_transcriber = None
+        self._speech_recognizer = None
+        if self._enable_speaker_labels:
+            if self._auto_detect_config:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                )
+            self._conversation_transcriber.transcribed.connect(self._on_transcribed)
+            self._conversation_transcriber.canceled.connect(self._on_canceled)
+            self._conversation_transcriber.session_stopped.connect(self._on_session_stopped)
+            self._conversation_transcriber.session_started.connect(self._on_session_started)
+        else:
+            if self._auto_detect_config:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(
+                    speech_config=self._speech_config, audio_config=audio_config
+                )
+            self._speech_recognizer.recognized.connect(self._on_recognized)
+            self._speech_recognizer.canceled.connect(self._on_canceled)
+            self._speech_recognizer.session_stopped.connect(self._on_session_stopped)
+            self._speech_recognizer.session_started.connect(self._on_session_started)
+
+    def restart(self) -> bool:
+        """Tear down the canceled recognizer and stand up a fresh one with a
+        valid token. Used by the worker to auto-recover from an auth-error
+        cancel without losing the rest of the meeting. Returns True on success."""
+        # Token was already refreshed in _on_canceled; refresh once more to be
+        # safe (handles the case where the cancel-time refresh failed).
+        self._refresh_token(force=True)
+        # Best-effort teardown of the dead recognizer.
+        try:
+            if self._use_conversation and self._conversation_transcriber is not None:
+                self._conversation_transcriber.stop_transcribing_async().get()
+            elif self._speech_recognizer is not None:
+                self._speech_recognizer.stop_continuous_recognition_async().get()
+        except Exception:
+            pass
+        try:
+            self.push_stream.close()
+        except Exception:
+            pass
+        # Reset the stopped flag and rebuild from scratch.
+        self._session_stopped_event.clear()
+        try:
+            self._build_recognizer()
+            if self._use_conversation:
+                assert self._conversation_transcriber is not None
+                self._conversation_transcriber.start_transcribing_async().get()
+            else:
+                assert self._speech_recognizer is not None
+                self._speech_recognizer.start_continuous_recognition_async().get()
+            return True
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Azure restart failed: {exc}", err=True)
+            return False
+
+    def _refresh_token(self, force: bool = False) -> bool:
+        """Fetch a fresh AAD token and apply it to the live speech_config.
+
+        Returns True if a new token was applied. Safe to call repeatedly; on
+        key-auth (no token_provider) it is a no-op.
+        """
+        if self._token_provider is None:
+            return False
+        try:
+            new_token = self._token_provider()
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Azure token refresh failed: {exc}", err=True)
+            return False
+        if not new_token:
+            return False
+        try:
+            self._speech_config.authorization_token = new_token
+            if force:
+                typer.echo("Azure token refreshed (post-auth-error).", err=True)
+            else:
+                typer.echo("Azure token refreshed (proactive).", err=True)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Failed to apply refreshed Azure token: {exc}", err=True)
+            return False
+
+    def _refresh_loop(self) -> None:
+        """Background thread: proactively refresh the AAD token on an interval
+        so the SDK's silent WebSocket reconnects always see a valid token."""
+        while not self._stop_event.wait(self._refresh_interval):
+            self._refresh_token(force=False)
+
     def start(self) -> None:
+        # Apply a fresh token before connecting, then keep it fresh in the
+        # background so mid-session reconnects never present an expired token.
+        self._refresh_token(force=False)
+        if self._token_provider is not None and self._refresh_thread is None:
+            self._refresh_thread = threading.Thread(
+                target=self._refresh_loop, daemon=True, name="azure-token-refresh"
+            )
+            self._refresh_thread.start()
         if self._use_conversation:
             assert self._conversation_transcriber is not None
             self._conversation_transcriber.start_transcribing_async().get()
@@ -835,6 +955,20 @@ def process_azure_backend(
     backend.start()
     try:
         while not stop_event.is_set() or not audio_queue.empty():
+            # If the session was canceled by an auth error (e.g. expired AAD
+            # token → 401 on WebSocket reconnect), transparently re-establish
+            # the recognizer instead of going permanently deaf. The token was
+            # already refreshed in _on_canceled; restart the recognizer here.
+            if backend._auth_error_event.is_set() and not stop_event.is_set():
+                typer.echo("Azure: auth error detected — re-establishing session...", err=True)
+                resumed = backend.restart()
+                if resumed:
+                    emit("[RTT: session auto-recovered after auth error]")
+                    backend._auth_error_event.clear()
+                else:
+                    typer.echo("Azure: auto-recovery failed, retrying in 3s...", err=True)
+                    time.sleep(3)
+                    continue
             if paused_event.is_set():
                 while True:
                     try:
@@ -1065,6 +1199,7 @@ def main(
             validate_azure_config(key, region, endpoint)
 
             auth_token = None
+            token_provider = None
             if not key:
                 if DefaultAzureCredential is None:
                     raise typer.BadParameter(
@@ -1080,8 +1215,16 @@ def main(
                 typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
                 try:
                     credential = DefaultAzureCredential()
-                    token = credential.get_token("https://cognitiveservices.azure.com/.default")
-                    auth_token = f"aad#{resource_id}#{token.token}"
+
+                    # Reusable closure so the backend can mint a FRESH token on
+                    # demand (proactive refresh + post-401 recovery). AAD tokens
+                    # expire ~60 min; without this the SDK's silent WebSocket
+                    # reconnect presents a stale token and the session 401s.
+                    def token_provider(_rid=resource_id, _cred=credential):
+                        tok = _cred.get_token("https://cognitiveservices.azure.com/.default")
+                        return f"aad#{_rid}#{tok.token}"
+
+                    auth_token = token_provider()
                 except Exception as exc:
                     typer.echo(f"Azure AD authentication failed: {exc}", err=True)
                     raise typer.Exit(code=1)
@@ -1101,6 +1244,7 @@ def main(
                     key=key,
                     auth_token=auth_token,
                     auto_detect_languages=auto_detect_langs,
+                    token_provider=token_provider if not key else None,
                 )
             except Exception as exc:
                 typer.echo(f"Failed to initialize Azure Speech backend: {exc}", err=True)
