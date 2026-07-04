@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-04 (rtt-cli)
+- **`rtt-cli`** — interactive menu / wizard / chat front-end for configuring and launching RTT. Zero new dependencies (pure stdlib).
+  - **Schema-driven** (`config_schema.py`): one declarative `Field` registry is the single source of truth. Wizard, chat parser, validation, and the launch-command builder all read from it — adding a new option = one Field entry, no UI changes.
+  - Three modes: main menu (profiles + edit + save/load), wizard (walks every applicable option, backend-aware), chat (natural language — "use hebrew", "chunk 8", "faster", "add my mic", "switch to local").
+  - 5 profiles (`rtt`/`rttheb`/`rttold`/`rtthebold`/`local`) resolved from the schema, mirroring the shell aliases. Named configs save to `~/.config/rtt-cli/`.
+  - `rtt-cli.sh` launcher + `rtt-cli` alias. Non-interactive `--print-argv` / `--launch` / `--profile` / `--load` entry points.
+  - Tests: `tests/test_rtt_cli.py` (23 tests incl. a same-backend alias-collision guard). Full suite 50/50.
+
 ## 2026-07-04
 - **Two new transcription backends** for the newer Azure speech models (chunked HTTP, `chunked_backends.py`):
   - **`--backend openai`** → Azure OpenAI `gpt-4o-transcribe-diarize`. Better WER, native diarization, ~1/3 the per-hour cost of classic Speech. New default for the `rtt` alias. Runs on a dedicated `rtt-transcribe-*` resource (eastus2).
