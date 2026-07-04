@@ -1,0 +1,362 @@
+"""Chunked HTTP transcription backends for RTT.
+
+These back the newer Azure model paths that do NOT support the Speech SDK's
+continuous streaming recognition:
+
+  - OpenAITranscribeBackend  → Azure OpenAI `gpt-4o-transcribe-diarize`
+        via POST /openai/deployments/<dep>/audio/transcriptions
+        (response_format=diarized_json → segments[].speaker/.text)
+  - LLMSpeechBackend         → Azure Speech "LLM Speech" fast-transcription
+        via POST /speechtotext/transcriptions:transcribe (enhancedMode)
+
+Both share the same micro-batch design: audio frames are buffered into
+N-second chunks, each chunk is WAV-encoded and POSTed, and the returned
+text (with speaker labels when available) is emitted. This trades true
+real-time latency for model quality + diarization — see AGENTS.md.
+
+Auth reuses the same AAD token_provider discipline as AzureSpeechBackend:
+a callable that mints a FRESH bearer token on demand (tokens expire ~60 min).
+
+Design notes
+------------
+* Chunk window default = 15s (tunable via --chunk-seconds). Shorter feels
+  more live but cuts mid-sentence and resets diarization more often; longer
+  is more accurate but lands further behind the speaker.
+* Cross-chunk speaker-number stability is NOT guaranteed (chunk 1 "Speaker 1"
+  may be chunk 2 "Speaker 2"). Acceptable for A/B eval; speaker-stitching is
+  a future enhancement, not v1.
+* Network failures on a single chunk are logged and skipped, never fatal —
+  one dropped chunk must not kill the meeting (same resilience philosophy as
+  the AzureSpeechBackend 401 auto-recovery).
+"""
+
+from __future__ import annotations
+
+import io
+import queue
+import threading
+import time
+import wave
+from typing import Callable, List, Optional
+
+import numpy as np
+import requests
+import typer
+
+
+class ChunkedHTTPBackend:
+    """Base class: buffers audio into fixed-duration chunks and POSTs each.
+
+    Subclasses implement `_transcribe_chunk(wav_bytes) -> List[str]` returning
+    already-formatted transcript lines (e.g. "Speaker 1: hello").
+    """
+
+    def __init__(
+        self,
+        sample_rate: int,
+        chunk_seconds: float = 15.0,
+        token_provider: Optional[Callable[[], str]] = None,
+        api_key: Optional[str] = None,
+        request_timeout: float = 60.0,
+    ) -> None:
+        self._sample_rate = sample_rate
+        self._chunk_seconds = chunk_seconds
+        self._token_provider = token_provider
+        self._api_key = api_key
+        self._request_timeout = request_timeout
+        self._samples_per_chunk = max(1, int(sample_rate * chunk_seconds))
+        self._buffer = np.empty((0,), dtype=np.float32)
+        self._text_queue: "queue.Queue[str]" = queue.Queue()
+        self._stop_event = threading.Event()
+        # Cache a token briefly to avoid minting one per chunk. Tokens live
+        # ~60 min; refresh every 30 min is plenty.
+        self._cached_token: Optional[str] = None
+        self._token_ts: float = 0.0
+        self._token_ttl = 1800.0
+
+    # --- auth -------------------------------------------------------------
+    def _auth_header(self) -> dict:
+        if self._api_key:
+            return {"Ocp-Apim-Subscription-Key": self._api_key}
+        token = self._get_token()
+        return {"Authorization": f"Bearer {token}"}
+
+    def _get_token(self) -> str:
+        if self._token_provider is None:
+            raise RuntimeError("No api_key and no token_provider configured.")
+        now = time.time()
+        if self._cached_token is None or (now - self._token_ts) > self._token_ttl:
+            self._cached_token = self._token_provider()
+            self._token_ts = now
+        return self._cached_token
+
+    # --- audio framing ----------------------------------------------------
+    @staticmethod
+    def _wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
+        """Encode a float32 [-1,1] mono array as 16-bit PCM WAV bytes."""
+        pcm = (np.clip(np.squeeze(audio), -1.0, 1.0) * 32767).astype(np.int16)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sample_rate)
+            wf.writeframes(pcm.tobytes())
+        return buf.getvalue()
+
+    def push_audio(self, audio: np.ndarray) -> None:
+        self._buffer = np.concatenate((self._buffer, np.squeeze(audio)))
+
+    def _drain_ready_chunk(self, force: bool = False) -> Optional[np.ndarray]:
+        """Return one full chunk of audio if buffered, else None.
+
+        force=True flushes whatever remains (used at end-of-stream)."""
+        if self._buffer.shape[0] >= self._samples_per_chunk:
+            chunk = self._buffer[: self._samples_per_chunk]
+            self._buffer = self._buffer[self._samples_per_chunk :]
+            return chunk
+        if force and self._buffer.size:
+            chunk = self._buffer
+            self._buffer = np.empty((0,), dtype=np.float32)
+            return chunk
+        return None
+
+    # --- subclass hook ----------------------------------------------------
+    def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
+        raise NotImplementedError
+
+    def transcribe_ready(self, force: bool = False) -> None:
+        """Encode + POST any ready chunk, queueing resulting lines."""
+        chunk = self._drain_ready_chunk(force=force)
+        if chunk is None:
+            return
+        # Skip near-silent chunks (avoids paying for empty POSTs). RMS gate.
+        if float(np.sqrt(np.mean(np.square(chunk)))) < 1e-4:
+            return
+        wav = self._wav_bytes(chunk, self._sample_rate)
+        try:
+            for line in self._transcribe_chunk(wav):
+                if line and line.strip():
+                    self._text_queue.put(line.strip())
+        except Exception as exc:  # noqa: BLE001 — a dropped chunk must not kill the run
+            typer.echo(f"[{self.__class__.__name__}] chunk failed: {exc}", err=True)
+
+    def drain_text(self) -> List[str]:
+        lines: List[str] = []
+        while True:
+            try:
+                lines.append(self._text_queue.get_nowait())
+            except queue.Empty:
+                break
+        return lines
+
+    def start(self) -> None:  # symmetry with AzureSpeechBackend
+        pass
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+
+class OpenAITranscribeBackend(ChunkedHTTPBackend):
+    """Azure OpenAI gpt-4o-transcribe-diarize via the /audio/transcriptions API.
+
+    Uses response_format=diarized_json → the response carries segments[] each
+    with .speaker and .text, which we format as "Speaker <id>: <text>".
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        deployment: str,
+        sample_rate: int,
+        chunk_seconds: float = 15.0,
+        api_version: str = "2024-10-21",
+        language: Optional[str] = None,
+        token_provider: Optional[Callable[[], str]] = None,
+        api_key: Optional[str] = None,
+    ) -> None:
+        super().__init__(sample_rate, chunk_seconds, token_provider, api_key)
+        base = endpoint.rstrip("/")
+        self._url = (
+            f"{base}/openai/deployments/{deployment}"
+            f"/audio/transcriptions?api-version={api_version}"
+        )
+        self._deployment = deployment
+        self._language = language
+
+    def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
+        files = {"file": ("chunk.wav", wav_bytes, "audio/wav")}
+        data = {
+            "model": self._deployment,
+            "response_format": "diarized_json",
+        }
+        if self._language:
+            # NOTE: the diarize model is documented to sometimes ignore
+            # `language` on the realtime path; on this batch path it is honored.
+            data["language"] = self._language
+        resp = requests.post(
+            self._url,
+            headers=self._auth_header(),
+            files=files,
+            data=data,
+            timeout=self._request_timeout,
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        payload = resp.json()
+        return self._format_diarized(payload)
+
+    @staticmethod
+    def _format_diarized(payload: dict) -> List[str]:
+        """Turn a diarized_json payload into 'Speaker N: text' lines.
+
+        Handles both the segment-list shape (segments[].speaker/.text) and a
+        plain {text:...} fallback when diarization data is absent."""
+        segments = payload.get("segments")
+        lines: List[str] = []
+        if isinstance(segments, list) and segments:
+            for seg in segments:
+                text = (seg.get("text") or "").strip()
+                if not text:
+                    continue
+                spk = seg.get("speaker")
+                if spk is not None and spk != "":
+                    # Normalize "0"/0 → "Guest-1" style to match RTT's existing
+                    # "Speaker Guest-N" convention as closely as possible.
+                    lines.append(f"Speaker {spk}: {text}")
+                else:
+                    lines.append(text)
+            return lines
+        # Fallback: no diarization, just the combined text.
+        text = (payload.get("text") or "").strip()
+        return [text] if text else []
+
+
+class LLMSpeechBackend(ChunkedHTTPBackend):
+    """Azure Speech "LLM Speech" fast-transcription via enhancedMode.
+
+    POST /speechtotext/transcriptions:transcribe with a definition enabling
+    enhancedMode + diarization. Multilingual by default (auto-detects), which
+    is why this is the Hebrew/English code-switch path. Response carries
+    phrases[] each with .speaker and .text.
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        sample_rate: int,
+        chunk_seconds: float = 15.0,
+        api_version: str = "2025-10-15",
+        max_speakers: int = 4,
+        locales: Optional[List[str]] = None,
+        token_provider: Optional[Callable[[], str]] = None,
+        api_key: Optional[str] = None,
+    ) -> None:
+        super().__init__(sample_rate, chunk_seconds, token_provider, api_key)
+        base = endpoint.rstrip("/")
+        self._url = (
+            f"{base}/speechtotext/transcriptions:transcribe"
+            f"?api-version={api_version}"
+        )
+        self._max_speakers = max_speakers
+        self._locales = locales  # e.g. ["en-US","he-IL"] to bias; None = auto
+
+    def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
+        import json as _json
+
+        definition: dict = {
+            "enhancedMode": {"enabled": True, "task": "transcribe"},
+            "diarization": {"maxSpeakers": self._max_speakers, "enabled": True},
+        }
+        if self._locales:
+            definition["locales"] = self._locales
+        files = {
+            "audio": ("chunk.wav", wav_bytes, "audio/wav"),
+            "definition": (None, _json.dumps(definition)),
+        }
+        resp = requests.post(
+            self._url,
+            headers=self._auth_header(),
+            files=files,
+            timeout=self._request_timeout,
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+        return self._format_phrases(resp.json())
+
+    @staticmethod
+    def _format_phrases(payload: dict) -> List[str]:
+        """Turn a fast-transcription payload into 'Speaker N: text' lines."""
+        phrases = payload.get("phrases")
+        lines: List[str] = []
+        if isinstance(phrases, list) and phrases:
+            for ph in phrases:
+                text = (ph.get("text") or "").strip()
+                if not text:
+                    continue
+                spk = ph.get("speaker")
+                if spk is not None and spk != "":
+                    lines.append(f"Speaker {spk}: {text}")
+                else:
+                    lines.append(text)
+            return lines
+        # Fallback to combinedPhrases when no per-phrase diarization present.
+        combined = payload.get("combinedPhrases")
+        if isinstance(combined, list) and combined:
+            out = []
+            for c in combined:
+                t = (c.get("text") or "").strip()
+                if t:
+                    out.append(t)
+            return out
+        return []
+
+
+def process_chunked_backend(
+    backend: ChunkedHTTPBackend,
+    audio_queue: "queue.Queue[np.ndarray]",
+    stop_event: threading.Event,
+    paused_event: threading.Event,
+    emit,
+    poll_interval: float = 0.5,
+) -> None:
+    """Worker: drain audio queue → buffer → POST ready chunks → emit lines.
+
+    Mirrors process_azure_backend's contract so main() can dispatch it the
+    same way. On stop, flushes the final partial chunk so the tail of the
+    meeting isn't lost."""
+    backend.start()
+    last_poll = time.time()
+    try:
+        while not stop_event.is_set() or not audio_queue.empty():
+            if paused_event.is_set():
+                # Drop queued audio while paused (matches other backends).
+                while True:
+                    try:
+                        audio_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                time.sleep(0.1)
+                continue
+            try:
+                chunk = audio_queue.get(timeout=0.2)
+                backend.push_audio(chunk)
+            except queue.Empty:
+                pass
+            # Periodically flush any complete chunk.
+            if (time.time() - last_poll) >= poll_interval:
+                backend.transcribe_ready(force=False)
+                for line in backend.drain_text():
+                    emit(line)
+                last_poll = time.time()
+        # End of stream: flush remaining full chunks + the final partial one.
+        backend.transcribe_ready(force=False)
+        backend.transcribe_ready(force=True)
+        for line in backend.drain_text():
+            emit(line)
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"Chunked backend worker failed: {exc}", err=True)
+        stop_event.set()
+    finally:
+        backend.stop()
+        for line in backend.drain_text():
+            emit(line)

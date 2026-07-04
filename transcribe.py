@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional, TYPE_CHECKING
+from typing import Callable, Iterable, List, Optional, TYPE_CHECKING
 
 from datetime import datetime
 
@@ -38,10 +38,18 @@ try:
 except ImportError:
     DefaultAzureCredential = None  # type: ignore
 
+from chunked_backends import (
+    OpenAITranscribeBackend,
+    LLMSpeechBackend,
+    process_chunked_backend,
+)
+
 app = typer.Typer(add_completion=False, help="Stream live audio into local or Azure speech recognizers.")
 
 BACKEND_LOCAL = "local"
 BACKEND_AZURE = "azure"
+BACKEND_OPENAI = "openai"        # Azure OpenAI gpt-4o-transcribe-diarize (chunked)
+BACKEND_LLMSPEECH = "llmspeech"  # Azure Speech LLM Speech enhancedMode (chunked)
 
 
 def default_transcript_path() -> Path:
@@ -1115,6 +1123,33 @@ def main(
         "--azure-languages",
         help="Comma-separated language codes for auto-detection, e.g. 'en-US,he-IL'. Overrides --language for Azure backend.",
     ),
+    chunk_seconds: float = typer.Option(
+        15.0,
+        "--chunk-seconds",
+        min=3.0,
+        max=60.0,
+        help="Chunk window (seconds) for openai/llmspeech backends. Larger = more accurate but higher latency.",
+    ),
+    openai_endpoint: Optional[str] = typer.Option(
+        None,
+        "--openai-endpoint",
+        help="Azure OpenAI resource endpoint for the 'openai' backend (or set RTT_OPENAI_ENDPOINT).",
+    ),
+    openai_deployment: str = typer.Option(
+        "gpt-4o-transcribe-diarize",
+        "--openai-deployment",
+        help="Deployment name for the 'openai' backend.",
+    ),
+    llmspeech_endpoint: Optional[str] = typer.Option(
+        None,
+        "--llmspeech-endpoint",
+        help="Azure Speech resource endpoint for the 'llmspeech' backend (or set RTT_LLMSPEECH_ENDPOINT / AZURE_SPEECH_ENDPOINT).",
+    ),
+    llmspeech_locales: Optional[str] = typer.Option(
+        None,
+        "--llmspeech-locales",
+        help="Comma-separated locales to bias the 'llmspeech' backend, e.g. 'en-US,he-IL'. Omit for multilingual auto-detect.",
+    ),
 ) -> None:
     if list_devices_flag:
         list_devices()
@@ -1134,8 +1169,8 @@ def main(
     hotkey_listener = ClipboardHotkeyListener(transcript_buffer, stop_event, paused_event)
     hotkey_listener.start()
 
-    if backend not in {BACKEND_LOCAL, BACKEND_AZURE}:
-        raise typer.BadParameter("--backend must be 'local' or 'azure'.")
+    if backend not in {BACKEND_LOCAL, BACKEND_AZURE, BACKEND_OPENAI, BACKEND_LLMSPEECH}:
+        raise typer.BadParameter("--backend must be 'local', 'azure', 'openai', or 'llmspeech'.")
     if azure_speaker_labels and backend != BACKEND_AZURE:
         raise typer.BadParameter("--azure-speaker-labels is only valid with --backend azure.")
 
@@ -1192,7 +1227,7 @@ def main(
                 args=(local_backend, audio_queue, stop_event, paused_event, emit, sample_rate, window_seconds),
                 daemon=True,
             )
-        else:
+        elif backend == BACKEND_AZURE:
             key = azure_key or os.environ.get("AZURE_SPEECH_KEY")
             region = azure_region or os.environ.get("AZURE_SPEECH_REGION")
             endpoint = azure_endpoint or os.environ.get("AZURE_SPEECH_ENDPOINT")
@@ -1252,6 +1287,94 @@ def main(
             worker = threading.Thread(
                 target=process_azure_backend,
                 args=(azure_backend, audio_queue, stop_event, paused_event, emit),
+                daemon=True,
+            )
+        else:
+            # Chunked HTTP backends (openai / llmspeech). Both micro-batch audio
+            # into --chunk-seconds windows and POST each chunk. Auth reuses the
+            # same AAD token_provider discipline as the Speech SDK backend: a
+            # callable that mints a FRESH bearer token on demand (~60 min TTL).
+            cog_key = azure_key or os.environ.get("AZURE_SPEECH_KEY")
+            cog_token_provider: Optional[Callable[[], str]] = None
+            if not cog_key:
+                if DefaultAzureCredential is None:
+                    raise typer.BadParameter(
+                        "No API key set and azure-identity is not installed. "
+                        "Install it with: pip install azure-identity"
+                    )
+                typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
+                try:
+                    _cred = DefaultAzureCredential()
+
+                    def _mint_cog_token(_c=_cred) -> str:
+                        return _c.get_token("https://cognitiveservices.azure.com/.default").token
+
+                    _mint_cog_token()  # fail fast if credentials are unusable
+                    cog_token_provider = _mint_cog_token
+                except Exception as exc:
+                    typer.echo(f"Azure AD authentication failed: {exc}", err=True)
+                    raise typer.Exit(code=1)
+                typer.echo("Azure AD token acquired successfully.")
+
+            if backend == BACKEND_OPENAI:
+                oai_endpoint = openai_endpoint or os.environ.get("RTT_OPENAI_ENDPOINT")
+                if not oai_endpoint:
+                    raise typer.BadParameter(
+                        "The 'openai' backend requires --openai-endpoint or RTT_OPENAI_ENDPOINT "
+                        "(the Azure OpenAI resource endpoint)."
+                    )
+                typer.echo(
+                    f"Starting Azure OpenAI transcribe backend "
+                    f"(deployment={openai_deployment}, chunk={chunk_seconds:.0f}s)"
+                )
+                try:
+                    chunked_backend = OpenAITranscribeBackend(
+                        endpoint=oai_endpoint,
+                        deployment=openai_deployment,
+                        sample_rate=sample_rate,
+                        chunk_seconds=chunk_seconds,
+                        language=language,
+                        token_provider=cog_token_provider,
+                        api_key=cog_key,
+                    )
+                except Exception as exc:
+                    typer.echo(f"Failed to initialize Azure OpenAI backend: {exc}", err=True)
+                    raise typer.Exit(code=1)
+            else:  # BACKEND_LLMSPEECH
+                lls_endpoint = (
+                    llmspeech_endpoint
+                    or os.environ.get("RTT_LLMSPEECH_ENDPOINT")
+                    or os.environ.get("AZURE_SPEECH_ENDPOINT")
+                )
+                if not lls_endpoint:
+                    raise typer.BadParameter(
+                        "The 'llmspeech' backend requires --llmspeech-endpoint, "
+                        "RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT "
+                        "(the Azure Speech resource endpoint)."
+                    )
+                locales_list: Optional[List[str]] = None
+                if llmspeech_locales:
+                    locales_list = [l.strip() for l in llmspeech_locales.split(",") if l.strip()]
+                typer.echo(
+                    f"Starting Azure LLM Speech backend "
+                    f"(chunk={chunk_seconds:.0f}s, locales={locales_list or 'auto'})"
+                )
+                try:
+                    chunked_backend = LLMSpeechBackend(
+                        endpoint=lls_endpoint,
+                        sample_rate=sample_rate,
+                        chunk_seconds=chunk_seconds,
+                        locales=locales_list,
+                        token_provider=cog_token_provider,
+                        api_key=cog_key,
+                    )
+                except Exception as exc:
+                    typer.echo(f"Failed to initialize Azure LLM Speech backend: {exc}", err=True)
+                    raise typer.Exit(code=1)
+
+            worker = threading.Thread(
+                target=process_chunked_backend,
+                args=(chunked_backend, audio_queue, stop_event, paused_event, emit),
                 daemon=True,
             )
 
