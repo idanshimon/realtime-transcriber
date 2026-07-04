@@ -1124,7 +1124,7 @@ def main(
         help="Comma-separated language codes for auto-detection, e.g. 'en-US,he-IL'. Overrides --language for Azure backend.",
     ),
     chunk_seconds: float = typer.Option(
-        15.0,
+        10.0,
         "--chunk-seconds",
         min=3.0,
         max=60.0,

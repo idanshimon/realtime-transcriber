@@ -4,7 +4,7 @@
 - **Two new transcription backends** for the newer Azure speech models (chunked HTTP, `chunked_backends.py`):
   - **`--backend openai`** → Azure OpenAI `gpt-4o-transcribe-diarize`. Better WER, native diarization, ~1/3 the per-hour cost of classic Speech. New default for the `rtt` alias. Runs on a dedicated `rtt-transcribe-*` resource (eastus2).
   - **`--backend llmspeech`** → Azure Speech "LLM Speech" `enhancedMode`. LLM-enhanced quality, multilingual auto-detect (Hebrew/English code-switching), diarization. New default for the `rttheb` alias. Runs on the existing Speech resource.
-- Both use a **micro-batch** design: audio is buffered into `--chunk-seconds` windows (default 15s) and POSTed per chunk. Trades true real-time latency for model quality. Includes a silence gate (skips quiet chunks) and per-chunk failure isolation (a dropped chunk never kills the run).
+- Both use a **micro-batch** design: audio is buffered into `--chunk-seconds` windows (default 10s) and POSTed per chunk. Trades true real-time latency for model quality. Includes a silence gate (skips quiet chunks) and per-chunk failure isolation (a dropped chunk never kills the run).
 - Auth reuses the AAD `token_provider` discipline (fresh bearer token on demand, 30-min cache); API-key auth also supported.
 - **Alias changes:** `rtt`→`run-openai.sh`, `rttheb`→`run-llmspeech.sh`. Classic Speech SDK backends preserved as **`rttold`** (`run-azure.sh`) and **`rtthebold`** (`run-azure-heb.sh`) for fallback + A/B baseline.
 - New CLI options: `--chunk-seconds`, `--openai-endpoint`, `--openai-deployment`, `--llmspeech-endpoint`, `--llmspeech-locales`. New env vars: `RTT_OPENAI_ENDPOINT`, `RTT_LLMSPEECH_ENDPOINT`.

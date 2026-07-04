@@ -141,13 +141,13 @@ Speaker diarization currently requires the Azure backend; local Whisper mode con
 
 ## Newer model backends (openai / llmspeech)
 
-Beyond the classic Speech SDK backend (`--backend azure`), RTT can transcribe with Microsoft's newer speech models over their REST APIs. These are **chunked** (micro-batch): audio is buffered into `--chunk-seconds` windows (default 15s) and POSTed per chunk, trading true real-time latency for higher model quality + native diarization.
+Beyond the classic Speech SDK backend (`--backend azure`), RTT can transcribe with Microsoft's newer speech models over their REST APIs. These are **chunked** (micro-batch): audio is buffered into `--chunk-seconds` windows (default 10s) and POSTed per chunk, trading true real-time latency for higher model quality + native diarization.
 
 ### `--backend openai` — Azure OpenAI `gpt-4o-transcribe-diarize`
 Better word error rate, native speaker diarization, ~1/3 the per-hour cost of classic Speech. Speaker labels are letters (`Speaker A`, `Speaker B`).
 ```bash
 # Needs RTT_OPENAI_ENDPOINT (Azure OpenAI resource endpoint) in .env
-python transcribe.py --backend openai --chunk-seconds 15
+python transcribe.py --backend openai --chunk-seconds 10
 # or just:
 ./run-openai.sh
 ```

@@ -19,7 +19,7 @@ a callable that mints a FRESH bearer token on demand (tokens expire ~60 min).
 
 Design notes
 ------------
-* Chunk window default = 15s (tunable via --chunk-seconds). Shorter feels
+* Chunk window default = 10s (tunable via --chunk-seconds). Shorter feels
   more live but cuts mid-sentence and resets diarization more often; longer
   is more accurate but lands further behind the speaker.
 * Cross-chunk speaker-number stability is NOT guaranteed (chunk 1 "Speaker 1"
@@ -54,7 +54,7 @@ class ChunkedHTTPBackend:
     def __init__(
         self,
         sample_rate: int,
-        chunk_seconds: float = 15.0,
+        chunk_seconds: float = 10.0,
         token_provider: Optional[Callable[[], str]] = None,
         api_key: Optional[str] = None,
         request_timeout: float = 60.0,
@@ -168,7 +168,7 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
         endpoint: str,
         deployment: str,
         sample_rate: int,
-        chunk_seconds: float = 15.0,
+        chunk_seconds: float = 10.0,
         api_version: str = "2024-10-21",
         language: Optional[str] = None,
         token_provider: Optional[Callable[[], str]] = None,
@@ -244,7 +244,7 @@ class LLMSpeechBackend(ChunkedHTTPBackend):
         self,
         endpoint: str,
         sample_rate: int,
-        chunk_seconds: float = 15.0,
+        chunk_seconds: float = 10.0,
         api_version: str = "2025-10-15",
         max_speakers: int = 4,
         locales: Optional[List[str]] = None,

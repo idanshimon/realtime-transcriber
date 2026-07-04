@@ -47,7 +47,7 @@ share a **micro-batch** design (`ChunkedHTTPBackend` base class in
 `chunked_backends.py`):
 
 1. Audio frames from the capture queue are buffered.
-2. When `--chunk-seconds` (default 15s) of audio has accumulated, the chunk is
+2. When `--chunk-seconds` (default 10s) of audio has accumulated, the chunk is
    WAV-encoded (16-bit PCM mono) and POSTed.
 3. Returned text (with speaker labels when present) is emitted to the transcript.
 
@@ -141,8 +141,9 @@ supported (`Ocp-Apim-Subscription-Key`). Bare bearer token here (not the
 
 ## Open questions
 
-1. Right default `--chunk-seconds` for live use? 15s is the starting guess;
-   tune after next week's live A/B.
+1. Right default `--chunk-seconds` for live use? Lowered from 15s to **10s**
+   (2026-07-04) before the live A/B — 15s felt too laggy. Tune further after
+   next week's live test.
 2. Add speaker-stitching across chunks, or leave labels chunk-local?
 3. Once validated, retire the classic backend or keep it permanently as the
    low-latency Hebrew path?
