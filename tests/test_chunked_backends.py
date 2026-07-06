@@ -220,3 +220,155 @@ def test_llmspeech_url_construction():
         api_key="dummy",
     )
     assert "/speechtotext/transcriptions:transcribe" in b._url
+
+
+# --------------------------------------------------------------------------
+# AAD token cache: real-expiry honoring + 401 self-heal (the mid-meeting fix)
+#
+# These lock in the behavior that lets a live call SURVIVE a token death without
+# a restart — same process, same session, diarization uninterrupted.
+# --------------------------------------------------------------------------
+
+import time as _time
+
+
+def test_token_provider_tuple_honors_real_expiry(monkeypatch):
+    """A (token, expires_on) tuple must refresh on the REAL expiry, not the
+    blind 30-min TTL. This is the root-cause fix: an already-aged `az` token
+    with <30 min life must be re-minted before it dies mid-meeting."""
+    now = _time.time()
+    mints = []
+
+    def provider():
+        # First token already almost dead (expires in 60s); second is healthy.
+        idx = len(mints)
+        mints.append(idx)
+        exp = now + 60 if idx == 0 else now + 3600
+        return (f"tok{idx}", exp)
+
+    b = ChunkedHTTPBackend(sample_rate=16000, token_provider=provider)
+    # First fetch caches tok0 (expiring in 60s, inside the 300s margin → stale).
+    assert b._get_token() == "tok0"
+    # Next fetch sees it's within the refresh margin of real expiry → re-mints.
+    assert b._get_token() == "tok1"
+    assert len(mints) == 2
+
+
+def test_token_bare_string_uses_fallback_ttl(monkeypatch):
+    """A bare-string provider (no expiry known) falls back to the wall-clock
+    TTL and does NOT re-mint on every call."""
+    mints = []
+
+    def provider():
+        mints.append(1)
+        return "bare-token"
+
+    b = ChunkedHTTPBackend(sample_rate=16000, token_provider=provider)
+    b._get_token()
+    b._get_token()  # within TTL → cached, no second mint
+    assert len(mints) == 1
+
+
+class _FakeResp:
+    def __init__(self, status_code, text="", payload=None):
+        self.status_code = status_code
+        self.text = text
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+
+def test_post_retries_once_on_401_with_fresh_token(monkeypatch):
+    """The load-bearing fix: a 401 must invalidate the token, force a fresh
+    mint, and retry the SAME chunk once — so a mid-call token death self-heals
+    instead of 401-storming forever."""
+    import chunked_backends as cb
+
+    mints = []
+
+    def provider():
+        mints.append(len(mints))
+        return (f"tok{len(mints) - 1}", _time.time() + 3600)
+
+    b = OpenAITranscribeBackend(
+        endpoint="https://res.cognitiveservices.azure.com/",
+        deployment="gpt-4o-transcribe-diarize",
+        sample_rate=16000,
+        token_provider=provider,
+    )
+
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        calls.append(headers.get("Authorization"))
+        # First call 401s, second (after refresh) succeeds.
+        if len(calls) == 1:
+            return _FakeResp(401, text="expired")
+        return _FakeResp(200, payload={"segments": [{"speaker": "A", "text": "recovered"}]})
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+
+    lines = b._transcribe_chunk(b"fakewav")
+    assert lines == ["Speaker A: recovered"]
+    assert len(calls) == 2                       # retried exactly once
+    assert calls[0] != calls[1]                  # a DIFFERENT (fresh) token
+    assert calls[0].endswith("tok0")
+    assert calls[1].endswith("tok1")
+
+
+def test_post_no_infinite_retry_on_persistent_401(monkeypatch):
+    """If auth stays broken, we retry ONCE then surface the error — we do not
+    loop forever, and the worker's per-chunk isolation swallows it."""
+    import chunked_backends as cb
+
+    def provider():
+        return ("tok", _time.time() + 3600)
+
+    b = OpenAITranscribeBackend(
+        endpoint="https://res.cognitiveservices.azure.com/",
+        deployment="d",
+        sample_rate=16000,
+        token_provider=provider,
+    )
+
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        calls.append(1)
+        return _FakeResp(401, text="still broken")
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+
+    import pytest
+    with pytest.raises(RuntimeError, match="HTTP 401"):
+        b._transcribe_chunk(b"fakewav")
+    assert len(calls) == 2  # original + one retry, then give up
+
+
+def test_key_auth_never_triggers_token_refresh(monkeypatch):
+    """API-key auth must not go near the token path (no provider → no 401
+    refresh attempt). Regression guard for the key-auth no-op contract."""
+    import chunked_backends as cb
+
+    b = OpenAITranscribeBackend(
+        endpoint="https://res.cognitiveservices.azure.com/",
+        deployment="d",
+        sample_rate=16000,
+        api_key="secret-key",
+    )
+
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        calls.append(headers)
+        return _FakeResp(401, text="nope")
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+
+    import pytest
+    with pytest.raises(RuntimeError, match="HTTP 401"):
+        b._transcribe_chunk(b"fakewav")
+    # Only ONE call — no token to refresh, so no retry; and it used the key.
+    assert len(calls) == 1
+    assert calls[0].get("Ocp-Apim-Subscription-Key") == "secret-key"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-06
+- **Fix: chunked backends (`openai`/`llmspeech`) no longer die mid-meeting on AAD token expiry.** A live call was dropping ~24 min in (not 60) with a permanent `chunk failed: HTTP 401` storm that never recovered — forcing a restart that reset diarization/speaker labels. Three compounding causes: (1) `DefaultAzureCredential` falls through to the shared `az` CLI token, often handed over already-aged (<30 min life); (2) the token cache used a blind 30-min wall-clock TTL that ignored the token's real `exp`; (3) a 401 never busted the cache, so the dead token was re-sent forever.
+  - **Real-expiry cache:** the AAD token provider now returns `(token, expires_on)`; the cache refreshes 5 min before actual expiry instead of a fixed TTL. Bare-string providers still supported.
+  - **One-shot 401 self-heal:** new `ChunkedHTTPBackend._post()` catches a 401/403, force-mints a fresh token, and retries the same chunk ONCE. A transient token death now self-heals in ~one chunk (~10s) in the **same process / same session** — no restart, so speaker labels are preserved. Persistent auth failure surfaces cleanly (no infinite loop); key-auth skips the path entirely.
+  - Tests: `tests/test_chunked_backends.py` +5 (real-expiry refresh, bare-string TTL fallback, 401-retry-with-fresh-token, no-infinite-retry, key-auth no-op). Full suite 55/55.
+
 ## 2026-07-04 (rtt-cli)
 - **`rtt-cli`** — interactive menu / wizard / chat front-end for configuring and launching RTT. Zero new dependencies (pure stdlib).
   - **Schema-driven** (`config_schema.py`): one declarative `Field` registry is the single source of truth. Wizard, chat parser, validation, and the launch-command builder all read from it — adding a new option = one Field entry, no UI changes.

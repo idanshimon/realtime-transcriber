@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, TYPE_CHECKING
+from typing import Callable, Iterable, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from datetime import datetime
 
@@ -1295,7 +1295,9 @@ def main(
             # same AAD token_provider discipline as the Speech SDK backend: a
             # callable that mints a FRESH bearer token on demand (~60 min TTL).
             cog_key = azure_key or os.environ.get("AZURE_SPEECH_KEY")
-            cog_token_provider: Optional[Callable[[], str]] = None
+            cog_token_provider: Optional[
+                Callable[[], Union[str, Tuple[str, float]]]
+            ] = None
             if not cog_key:
                 if DefaultAzureCredential is None:
                     raise typer.BadParameter(
@@ -1306,8 +1308,15 @@ def main(
                 try:
                     _cred = DefaultAzureCredential()
 
-                    def _mint_cog_token(_c=_cred) -> str:
-                        return _c.get_token("https://cognitiveservices.azure.com/.default").token
+                    # Return (token, expires_on) so the backend refreshes on the
+                    # token's REAL expiry, not a blind wall-clock TTL. Critical
+                    # because DefaultAzureCredential often falls through to the
+                    # shared `az` CLI token, which can be handed over already
+                    # aged (<30 min life) — a fixed 30-min TTL would then let it
+                    # die mid-meeting before the scheduled refresh ever fires.
+                    def _mint_cog_token(_c=_cred):
+                        tok = _c.get_token("https://cognitiveservices.azure.com/.default")
+                        return (tok.token, float(tok.expires_on))
 
                     _mint_cog_token()  # fail fast if credentials are unusable
                     cog_token_provider = _mint_cog_token

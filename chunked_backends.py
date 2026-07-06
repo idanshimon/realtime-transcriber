@@ -37,7 +37,10 @@ import queue
 import threading
 import time
 import wave
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple, Union
+
+# A token provider returns either a bare token string or (token, expires_on_epoch).
+TokenProvider = Callable[[], Union[str, Tuple[str, float]]]
 
 import numpy as np
 import requests
@@ -55,7 +58,7 @@ class ChunkedHTTPBackend:
         self,
         sample_rate: int,
         chunk_seconds: float = 10.0,
-        token_provider: Optional[Callable[[], str]] = None,
+        token_provider: Optional["TokenProvider"] = None,
         api_key: Optional[str] = None,
         request_timeout: float = 60.0,
     ) -> None:
@@ -65,30 +68,93 @@ class ChunkedHTTPBackend:
         self._api_key = api_key
         self._request_timeout = request_timeout
         self._samples_per_chunk = max(1, int(sample_rate * chunk_seconds))
+        self._url: str = ""  # set by subclass __init__; used by _post()
         self._buffer = np.empty((0,), dtype=np.float32)
         self._text_queue: "queue.Queue[str]" = queue.Queue()
         self._stop_event = threading.Event()
-        # Cache a token briefly to avoid minting one per chunk. Tokens live
-        # ~60 min; refresh every 30 min is plenty.
+        # Token cache. The provider may return either a bare token string OR a
+        # (token, expires_on_epoch) tuple. When the real expiry is known we
+        # refresh 5 min before it; otherwise we fall back to a conservative TTL.
+        # NOTE: with AzureCliCredential the token is SHARED with `az` and can be
+        # handed over already-aged (<30 min life), so a blind wall-clock TTL is a
+        # lie — honoring the real `expires_on` is what prevents the mid-meeting
+        # death. Reactive 401 recovery (see _post) is the belt-and-suspenders.
         self._cached_token: Optional[str] = None
+        self._token_expiry: float = 0.0   # real epoch expiry when provider supplies it
         self._token_ts: float = 0.0
-        self._token_ttl = 1800.0
+        self._token_ttl = 1800.0          # fallback only when expiry is unknown
+        self._token_refresh_margin = 300.0
+        self._token_lock = threading.Lock()
 
     # --- auth -------------------------------------------------------------
-    def _auth_header(self) -> dict:
+    def _auth_header(self, force_refresh: bool = False) -> dict:
         if self._api_key:
             return {"Ocp-Apim-Subscription-Key": self._api_key}
-        token = self._get_token()
+        token = self._get_token(force_refresh=force_refresh)
         return {"Authorization": f"Bearer {token}"}
 
-    def _get_token(self) -> str:
+    def _get_token(self, force_refresh: bool = False) -> str:
         if self._token_provider is None:
             raise RuntimeError("No api_key and no token_provider configured.")
         now = time.time()
-        if self._cached_token is None or (now - self._token_ts) > self._token_ttl:
-            self._cached_token = self._token_provider()
-            self._token_ts = now
-        return self._cached_token
+        with self._token_lock:
+            if self._token_expiry:
+                stale = now >= (self._token_expiry - self._token_refresh_margin)
+            else:
+                stale = (now - self._token_ts) > self._token_ttl
+            if force_refresh or self._cached_token is None or stale:
+                result = self._token_provider()
+                if isinstance(result, tuple):
+                    self._cached_token = result[0]
+                    self._token_expiry = float(result[1])
+                else:
+                    self._cached_token = result
+                    self._token_expiry = 0.0
+                self._token_ts = now
+            return self._cached_token
+
+    def _invalidate_token(self) -> None:
+        """Drop the cached token so the next _get_token mints a fresh one.
+
+        Called after a 401/403 so an expired token can't be re-sent forever.
+        Forcing a re-mint after expiry makes AzureCliCredential/MSAL refresh the
+        underlying `az` token instead of returning the dead cached one.
+        """
+        with self._token_lock:
+            self._cached_token = None
+            self._token_expiry = 0.0
+
+    def _post(self, *, files, data=None) -> "requests.Response":
+        """POST to self._url with AAD/key auth and one-shot 401 recovery.
+
+        Shared by all chunked subclasses so the token-expiry recovery lives in
+        ONE place. On a 401/403 with AAD auth we invalidate the cached token,
+        force a fresh mint, and retry the chunk exactly once — turning what used
+        to be a permanent mid-meeting 401 storm into a ~10s self-heal. Payloads
+        are plain bytes/dicts, safe to re-send on the retry.
+        """
+        resp = requests.post(
+            self._url,
+            headers=self._auth_header(),
+            files=files,
+            data=data,
+            timeout=self._request_timeout,
+        )
+        if resp.status_code in (401, 403) and self._token_provider is not None:
+            typer.echo(
+                f"[{self.__class__.__name__}] auth {resp.status_code} — "
+                f"refreshing AAD token and retrying chunk",
+                err=True,
+            )
+            self._invalidate_token()
+            resp = requests.post(
+                self._url,
+                headers=self._auth_header(force_refresh=True),
+                files=files,
+                data=data,
+                timeout=self._request_timeout,
+            )
+        return resp
 
     # --- audio framing ----------------------------------------------------
     @staticmethod
@@ -171,7 +237,7 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
         chunk_seconds: float = 10.0,
         api_version: str = "2024-10-21",
         language: Optional[str] = None,
-        token_provider: Optional[Callable[[], str]] = None,
+        token_provider: Optional["TokenProvider"] = None,
         api_key: Optional[str] = None,
     ) -> None:
         super().__init__(sample_rate, chunk_seconds, token_provider, api_key)
@@ -193,13 +259,7 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
             # NOTE: the diarize model is documented to sometimes ignore
             # `language` on the realtime path; on this batch path it is honored.
             data["language"] = self._language
-        resp = requests.post(
-            self._url,
-            headers=self._auth_header(),
-            files=files,
-            data=data,
-            timeout=self._request_timeout,
-        )
+        resp = self._post(files=files, data=data)
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
         payload = resp.json()
@@ -248,7 +308,7 @@ class LLMSpeechBackend(ChunkedHTTPBackend):
         api_version: str = "2025-10-15",
         max_speakers: int = 4,
         locales: Optional[List[str]] = None,
-        token_provider: Optional[Callable[[], str]] = None,
+        token_provider: Optional["TokenProvider"] = None,
         api_key: Optional[str] = None,
     ) -> None:
         super().__init__(sample_rate, chunk_seconds, token_provider, api_key)
@@ -273,12 +333,7 @@ class LLMSpeechBackend(ChunkedHTTPBackend):
             "audio": ("chunk.wav", wav_bytes, "audio/wav"),
             "definition": (None, _json.dumps(definition)),
         }
-        resp = requests.post(
-            self._url,
-            headers=self._auth_header(),
-            files=files,
-            timeout=self._request_timeout,
-        )
+        resp = self._post(files=files)
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
         return self._format_phrases(resp.json())
