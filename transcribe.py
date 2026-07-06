@@ -13,7 +13,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional, TYPE_CHECKING
+from typing import Callable, Iterable, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from datetime import datetime
 
@@ -38,10 +38,18 @@ try:
 except ImportError:
     DefaultAzureCredential = None  # type: ignore
 
+from chunked_backends import (
+    OpenAITranscribeBackend,
+    LLMSpeechBackend,
+    process_chunked_backend,
+)
+
 app = typer.Typer(add_completion=False, help="Stream live audio into local or Azure speech recognizers.")
 
 BACKEND_LOCAL = "local"
 BACKEND_AZURE = "azure"
+BACKEND_OPENAI = "openai"        # Azure OpenAI gpt-4o-transcribe-diarize (chunked)
+BACKEND_LLMSPEECH = "llmspeech"  # Azure Speech LLM Speech enhancedMode (chunked)
 
 
 def default_transcript_path() -> Path:
@@ -57,25 +65,76 @@ class TranscriptBuffer:
         # Index into `_lines` used for Ctrl+E delta copies (since last Ctrl+S).
         # Starts at 0 so Ctrl+E before the first Ctrl+S returns the full transcript.
         self._delta_baseline: int = 0
+        # Speaker rename map: "Guest-1" -> "Hawk Ticehurst". Applied at write/render time.
+        self._speaker_map: dict = {}
         if file_path:
             file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _apply_speaker_map(self, line: str) -> str:
+        if not self._speaker_map:
+            return line
+        out = line
+        for src, dst in self._speaker_map.items():
+            # Match "Speaker Guest-2:" or "Speaker Guest-2 " patterns.
+            out = out.replace(f"Speaker {src}:", f"Speaker {dst}:")
+            out = out.replace(f"Speaker {src} ", f"Speaker {dst} ")
+        return out
 
     def add(self, line: str) -> None:
         with self._lock:
             self._lines.append(line)
             if self._file_path:
                 with self._file_path.open("a", encoding="utf-8") as handle:
-                    handle.write(line + "\n")
+                    handle.write(self._apply_speaker_map(line) + "\n")
+
+    def known_speakers(self) -> List[str]:
+        """Return distinct speaker labels seen so far (e.g. ['Guest-1', 'Guest-2'])."""
+        speakers: List[str] = []
+        seen = set()
+        with self._lock:
+            for ln in self._lines:
+                # Format: "[HH:MM:SS] Speaker XXX: text"
+                idx = ln.find("Speaker ")
+                if idx < 0:
+                    continue
+                tail = ln[idx + len("Speaker "):]
+                colon = tail.find(":")
+                if colon < 0:
+                    continue
+                name = tail[:colon].strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    speakers.append(name)
+        return speakers
+
+    def rename_speaker(self, src: str, dst: str) -> int:
+        """Map src->dst going forward AND rewrite the file with substitutions applied.
+        Returns the number of past lines updated."""
+        if not src or not dst:
+            return 0
+        with self._lock:
+            self._speaker_map[src] = dst
+            updated = 0
+            for ln in self._lines:
+                if f"Speaker {src}:" in ln or f"Speaker {src} " in ln:
+                    updated += 1
+            if self._file_path and self._file_path.exists():
+                rendered = [self._apply_speaker_map(ln) for ln in self._lines]
+                # Rewrite atomically.
+                tmp = self._file_path.with_suffix(self._file_path.suffix + ".tmp")
+                tmp.write_text("\n".join(rendered) + ("\n" if rendered else ""), encoding="utf-8")
+                tmp.replace(self._file_path)
+            return updated
 
     def snapshot(self) -> str:
         with self._lock:
-            return "\n".join(self._lines)
+            return "\n".join(self._apply_speaker_map(ln) for ln in self._lines)
 
     def _delta_snapshot_locked(self) -> str:
         baseline = max(0, min(self._delta_baseline, len(self._lines)))
         if baseline >= len(self._lines):
             return ""
-        return "\n".join(self._lines[baseline:])
+        return "\n".join(self._apply_speaker_map(ln) for ln in self._lines[baseline:])
 
     def copy_full_to_clipboard(self) -> None:
         text = self.snapshot()
@@ -126,6 +185,57 @@ class ClipboardHotkeyListener(threading.Thread):
         else:
             self._run_posix()
 
+    def _prompt_rename(self) -> None:
+        """Pause raw-mode input, prompt user for src=dst, apply, resume."""
+        speakers = self._buffer.known_speakers()
+        is_windows = os.name == "nt"
+        # Restore canonical mode on POSIX so input() works normally.
+        if not is_windows and self._orig_termios is not None:
+            try:
+                import termios
+                termios.tcsetattr(self._stdin_fd, termios.TCSANOW, self._orig_termios)
+            except Exception:
+                pass
+        try:
+            sys.stdout.write("\n\u270f\ufe0f  Rename speaker. ")
+            if speakers:
+                sys.stdout.write(f"Known: {', '.join(speakers)}\n")
+            else:
+                sys.stdout.write("(No speakers labeled yet.)\n")
+            sys.stdout.write('src=dst (e.g. "Guest-2=Hawk Ticehurst") or blank to cancel: ')
+            sys.stdout.flush()
+            try:
+                raw = sys.stdin.readline().rstrip("\n")
+            except (EOFError, KeyboardInterrupt):
+                raw = ""
+            if not raw.strip():
+                typer.echo("Rename cancelled.")
+                return
+            if "=" not in raw:
+                typer.echo("\u26a0\ufe0f  Invalid format. Use src=dst (e.g. Guest-2=Hawk Ticehurst).", err=True)
+                return
+            src, _, dst = raw.partition("=")
+            src = src.strip()
+            dst = dst.strip()
+            if not src or not dst:
+                typer.echo("\u26a0\ufe0f  Both src and dst are required.", err=True)
+                return
+            if speakers and src not in speakers:
+                typer.echo(f"\u26a0\ufe0f  '{src}' not in known speakers ({', '.join(speakers)}). Mapping anyway.")
+            count = self._buffer.rename_speaker(src, dst)
+            typer.echo(f"\u2705 Renamed {src} \u2192 {dst} ({count} past lines updated, future lines auto-mapped).")
+        finally:
+            # Re-enter raw mode on POSIX.
+            if not is_windows and self._orig_termios is not None:
+                try:
+                    import termios
+                    new_attrs = termios.tcgetattr(self._stdin_fd)
+                    new_attrs[3] &= ~(termios.ECHO | termios.ICANON)
+                    new_attrs[0] &= ~termios.IXON
+                    termios.tcsetattr(self._stdin_fd, termios.TCSANOW, new_attrs)
+                except Exception:
+                    pass
+
     def _run_windows(self) -> None:
         try:
             import msvcrt  # type: ignore
@@ -146,6 +256,8 @@ class ClipboardHotkeyListener(threading.Thread):
                     else:
                         self._paused_event.set()
                         typer.echo("Transcription paused (Ctrl+P).")
+                elif ch == "\x12":  # Ctrl+R
+                    self._prompt_rename()
             time.sleep(0.05)
 
     def _run_posix(self) -> None:
@@ -182,6 +294,8 @@ class ClipboardHotkeyListener(threading.Thread):
                         else:
                             self._paused_event.set()
                             typer.echo("Transcription paused (Ctrl+P).")
+                    elif ch == b"\x12":  # Ctrl+R
+                        self._prompt_rename()
         finally:
             if self._orig_termios is not None:
                 termios.tcsetattr(self._stdin_fd, termios.TCSANOW, self._orig_termios)
@@ -496,6 +610,7 @@ class AzureSpeechBackend:
         key: Optional[str] = None,
         auth_token: Optional[str] = None,
         auto_detect_languages: Optional[List[str]] = None,
+        token_provider=None,
     ) -> None:
         if speechsdk is None:
             raise RuntimeError("azure-cognitiveservices-speech is not installed.")
@@ -546,44 +661,29 @@ class AzureSpeechBackend:
             )
             if diarize_property is not None:
                 speech_config.set_property(property_id=diarize_property, value="true")
-        stream_format = speechsdk.audio.AudioStreamFormat(samples_per_second=sample_rate, bits_per_sample=16, channels=1)
-        self.push_stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
-        audio_config = speechsdk.audio.AudioConfig(stream=self.push_stream)
+        self._enable_speaker_labels = enable_speaker_labels
         self._use_conversation = enable_speaker_labels
         self._conversation_transcriber = None
         self._speech_recognizer = None
-        if enable_speaker_labels:
-            if self._auto_detect_config:
-                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                    auto_detect_source_language_config=self._auto_detect_config,
-                )
-            else:
-                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                )
-            self._conversation_transcriber.transcribed.connect(self._on_transcribed)
-            self._conversation_transcriber.canceled.connect(self._on_canceled)
-            self._conversation_transcriber.session_stopped.connect(self._on_session_stopped)
-            self._conversation_transcriber.session_started.connect(self._on_session_started)
-        else:
-            if self._auto_detect_config:
-                self._speech_recognizer = speechsdk.SpeechRecognizer(
-                    speech_config=speech_config,
-                    audio_config=audio_config,
-                    auto_detect_source_language_config=self._auto_detect_config,
-                )
-            else:
-                self._speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-            self._speech_recognizer.recognized.connect(self._on_recognized)
-            self._speech_recognizer.canceled.connect(self._on_canceled)
-            self._speech_recognizer.session_stopped.connect(self._on_session_stopped)
-            self._speech_recognizer.session_started.connect(self._on_session_started)
+        self._speech_config = speech_config
+        self._token_provider = token_provider
+        self._sample_rate = sample_rate
+        self._build_recognizer()
         self._text_queue: "queue.Queue[str]" = queue.Queue()
         self._stop_event = threading.Event()
         self._session_stopped_event = threading.Event()
+        self._auth_error_event = threading.Event()
+        # --- Token auto-refresh (AAD) ---
+        # AAD tokens expire ~60-90 min. The Speech SDK silently rotates its
+        # WebSocket connection mid-session; if the authorization_token is stale
+        # at that moment the upgrade fails with HTTP 401 and the session is
+        # canceled. We proactively refresh authorization_token on the live
+        # speech_config every few minutes so a fresh token is always present.
+        self._speech_config = speech_config
+        self._token_provider = token_provider
+        self._sample_rate = sample_rate
+        self._refresh_thread: Optional[threading.Thread] = None
+        self._refresh_interval = 540  # seconds (9 min — well under the ~60 min TTL)
 
     def _on_session_started(self, evt) -> None:
         session_id = getattr(evt, "session_id", None) or getattr(evt, "sessionId", None)
@@ -619,6 +719,21 @@ class AzureSpeechBackend:
             except Exception:
                 pass
 
+        # Detect auth/connection failures (e.g. expired AAD token → 401 on
+        # WebSocket upgrade) so the worker loop can transparently re-auth and
+        # resume instead of leaving the session permanently deaf.
+        details_str = str(error_details or "")
+        is_auth_error = (
+            "401" in details_str
+            or "Authentication" in details_str
+            or "Forbidden" in details_str
+            or "403" in details_str
+        )
+        if is_auth_error:
+            self._auth_error_event.set()
+            # Refresh the token immediately so the next start() uses a valid one.
+            self._refresh_token(force=True)
+
         typer.echo(f"Azure canceled (reason={reason}, code={error_code}): {error_details}", err=True)
 
     def _on_session_stopped(self, evt) -> None:
@@ -629,7 +744,126 @@ class AzureSpeechBackend:
             typer.echo("Azure session stopped", err=True)
         self._session_stopped_event.set()
 
+    def _build_recognizer(self) -> None:
+        """(Re)build the push stream + recognizer/transcriber and wire events.
+
+        Called once at init and again by restart() after an auth-error cancel.
+        A PushAudioInputStream cannot be reused after the session is canceled,
+        so we always create a fresh one here."""
+        stream_format = speechsdk.audio.AudioStreamFormat(
+            samples_per_second=self._sample_rate, bits_per_sample=16, channels=1
+        )
+        self.push_stream = speechsdk.audio.PushAudioInputStream(stream_format=stream_format)
+        audio_config = speechsdk.audio.AudioConfig(stream=self.push_stream)
+        self._conversation_transcriber = None
+        self._speech_recognizer = None
+        if self._enable_speaker_labels:
+            if self._auto_detect_config:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._conversation_transcriber = speechsdk.transcription.ConversationTranscriber(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                )
+            self._conversation_transcriber.transcribed.connect(self._on_transcribed)
+            self._conversation_transcriber.canceled.connect(self._on_canceled)
+            self._conversation_transcriber.session_stopped.connect(self._on_session_stopped)
+            self._conversation_transcriber.session_started.connect(self._on_session_started)
+        else:
+            if self._auto_detect_config:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(
+                    speech_config=self._speech_config,
+                    audio_config=audio_config,
+                    auto_detect_source_language_config=self._auto_detect_config,
+                )
+            else:
+                self._speech_recognizer = speechsdk.SpeechRecognizer(
+                    speech_config=self._speech_config, audio_config=audio_config
+                )
+            self._speech_recognizer.recognized.connect(self._on_recognized)
+            self._speech_recognizer.canceled.connect(self._on_canceled)
+            self._speech_recognizer.session_stopped.connect(self._on_session_stopped)
+            self._speech_recognizer.session_started.connect(self._on_session_started)
+
+    def restart(self) -> bool:
+        """Tear down the canceled recognizer and stand up a fresh one with a
+        valid token. Used by the worker to auto-recover from an auth-error
+        cancel without losing the rest of the meeting. Returns True on success."""
+        # Token was already refreshed in _on_canceled; refresh once more to be
+        # safe (handles the case where the cancel-time refresh failed).
+        self._refresh_token(force=True)
+        # Best-effort teardown of the dead recognizer.
+        try:
+            if self._use_conversation and self._conversation_transcriber is not None:
+                self._conversation_transcriber.stop_transcribing_async().get()
+            elif self._speech_recognizer is not None:
+                self._speech_recognizer.stop_continuous_recognition_async().get()
+        except Exception:
+            pass
+        try:
+            self.push_stream.close()
+        except Exception:
+            pass
+        # Reset the stopped flag and rebuild from scratch.
+        self._session_stopped_event.clear()
+        try:
+            self._build_recognizer()
+            if self._use_conversation:
+                assert self._conversation_transcriber is not None
+                self._conversation_transcriber.start_transcribing_async().get()
+            else:
+                assert self._speech_recognizer is not None
+                self._speech_recognizer.start_continuous_recognition_async().get()
+            return True
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Azure restart failed: {exc}", err=True)
+            return False
+
+    def _refresh_token(self, force: bool = False) -> bool:
+        """Fetch a fresh AAD token and apply it to the live speech_config.
+
+        Returns True if a new token was applied. Safe to call repeatedly; on
+        key-auth (no token_provider) it is a no-op.
+        """
+        if self._token_provider is None:
+            return False
+        try:
+            new_token = self._token_provider()
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Azure token refresh failed: {exc}", err=True)
+            return False
+        if not new_token:
+            return False
+        try:
+            self._speech_config.authorization_token = new_token
+            if force:
+                typer.echo("Azure token refreshed (post-auth-error).", err=True)
+            else:
+                typer.echo("Azure token refreshed (proactive).", err=True)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"Failed to apply refreshed Azure token: {exc}", err=True)
+            return False
+
+    def _refresh_loop(self) -> None:
+        """Background thread: proactively refresh the AAD token on an interval
+        so the SDK's silent WebSocket reconnects always see a valid token."""
+        while not self._stop_event.wait(self._refresh_interval):
+            self._refresh_token(force=False)
+
     def start(self) -> None:
+        # Apply a fresh token before connecting, then keep it fresh in the
+        # background so mid-session reconnects never present an expired token.
+        self._refresh_token(force=False)
+        if self._token_provider is not None and self._refresh_thread is None:
+            self._refresh_thread = threading.Thread(
+                target=self._refresh_loop, daemon=True, name="azure-token-refresh"
+            )
+            self._refresh_thread.start()
         if self._use_conversation:
             assert self._conversation_transcriber is not None
             self._conversation_transcriber.start_transcribing_async().get()
@@ -729,6 +963,20 @@ def process_azure_backend(
     backend.start()
     try:
         while not stop_event.is_set() or not audio_queue.empty():
+            # If the session was canceled by an auth error (e.g. expired AAD
+            # token → 401 on WebSocket reconnect), transparently re-establish
+            # the recognizer instead of going permanently deaf. The token was
+            # already refreshed in _on_canceled; restart the recognizer here.
+            if backend._auth_error_event.is_set() and not stop_event.is_set():
+                typer.echo("Azure: auth error detected — re-establishing session...", err=True)
+                resumed = backend.restart()
+                if resumed:
+                    emit("[RTT: session auto-recovered after auth error]")
+                    backend._auth_error_event.clear()
+                else:
+                    typer.echo("Azure: auto-recovery failed, retrying in 3s...", err=True)
+                    time.sleep(3)
+                    continue
             if paused_event.is_set():
                 while True:
                     try:
@@ -875,6 +1123,33 @@ def main(
         "--azure-languages",
         help="Comma-separated language codes for auto-detection, e.g. 'en-US,he-IL'. Overrides --language for Azure backend.",
     ),
+    chunk_seconds: float = typer.Option(
+        10.0,
+        "--chunk-seconds",
+        min=3.0,
+        max=60.0,
+        help="Chunk window (seconds) for openai/llmspeech backends. Larger = more accurate but higher latency.",
+    ),
+    openai_endpoint: Optional[str] = typer.Option(
+        None,
+        "--openai-endpoint",
+        help="Azure OpenAI resource endpoint for the 'openai' backend (or set RTT_OPENAI_ENDPOINT).",
+    ),
+    openai_deployment: str = typer.Option(
+        "gpt-4o-transcribe-diarize",
+        "--openai-deployment",
+        help="Deployment name for the 'openai' backend.",
+    ),
+    llmspeech_endpoint: Optional[str] = typer.Option(
+        None,
+        "--llmspeech-endpoint",
+        help="Azure Speech resource endpoint for the 'llmspeech' backend (or set RTT_LLMSPEECH_ENDPOINT / AZURE_SPEECH_ENDPOINT).",
+    ),
+    llmspeech_locales: Optional[str] = typer.Option(
+        None,
+        "--llmspeech-locales",
+        help="Comma-separated locales to bias the 'llmspeech' backend, e.g. 'en-US,he-IL'. Omit for multilingual auto-detect.",
+    ),
 ) -> None:
     if list_devices_flag:
         list_devices()
@@ -894,8 +1169,8 @@ def main(
     hotkey_listener = ClipboardHotkeyListener(transcript_buffer, stop_event, paused_event)
     hotkey_listener.start()
 
-    if backend not in {BACKEND_LOCAL, BACKEND_AZURE}:
-        raise typer.BadParameter("--backend must be 'local' or 'azure'.")
+    if backend not in {BACKEND_LOCAL, BACKEND_AZURE, BACKEND_OPENAI, BACKEND_LLMSPEECH}:
+        raise typer.BadParameter("--backend must be 'local', 'azure', 'openai', or 'llmspeech'.")
     if azure_speaker_labels and backend != BACKEND_AZURE:
         raise typer.BadParameter("--azure-speaker-labels is only valid with --backend azure.")
 
@@ -952,13 +1227,14 @@ def main(
                 args=(local_backend, audio_queue, stop_event, paused_event, emit, sample_rate, window_seconds),
                 daemon=True,
             )
-        else:
+        elif backend == BACKEND_AZURE:
             key = azure_key or os.environ.get("AZURE_SPEECH_KEY")
             region = azure_region or os.environ.get("AZURE_SPEECH_REGION")
             endpoint = azure_endpoint or os.environ.get("AZURE_SPEECH_ENDPOINT")
             validate_azure_config(key, region, endpoint)
 
             auth_token = None
+            token_provider = None
             if not key:
                 if DefaultAzureCredential is None:
                     raise typer.BadParameter(
@@ -974,8 +1250,16 @@ def main(
                 typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
                 try:
                     credential = DefaultAzureCredential()
-                    token = credential.get_token("https://cognitiveservices.azure.com/.default")
-                    auth_token = f"aad#{resource_id}#{token.token}"
+
+                    # Reusable closure so the backend can mint a FRESH token on
+                    # demand (proactive refresh + post-401 recovery). AAD tokens
+                    # expire ~60 min; without this the SDK's silent WebSocket
+                    # reconnect presents a stale token and the session 401s.
+                    def token_provider(_rid=resource_id, _cred=credential):
+                        tok = _cred.get_token("https://cognitiveservices.azure.com/.default")
+                        return f"aad#{_rid}#{tok.token}"
+
+                    auth_token = token_provider()
                 except Exception as exc:
                     typer.echo(f"Azure AD authentication failed: {exc}", err=True)
                     raise typer.Exit(code=1)
@@ -995,6 +1279,7 @@ def main(
                     key=key,
                     auth_token=auth_token,
                     auto_detect_languages=auto_detect_langs,
+                    token_provider=token_provider if not key else None,
                 )
             except Exception as exc:
                 typer.echo(f"Failed to initialize Azure Speech backend: {exc}", err=True)
@@ -1002,6 +1287,103 @@ def main(
             worker = threading.Thread(
                 target=process_azure_backend,
                 args=(azure_backend, audio_queue, stop_event, paused_event, emit),
+                daemon=True,
+            )
+        else:
+            # Chunked HTTP backends (openai / llmspeech). Both micro-batch audio
+            # into --chunk-seconds windows and POST each chunk. Auth reuses the
+            # same AAD token_provider discipline as the Speech SDK backend: a
+            # callable that mints a FRESH bearer token on demand (~60 min TTL).
+            cog_key = azure_key or os.environ.get("AZURE_SPEECH_KEY")
+            cog_token_provider: Optional[
+                Callable[[], Union[str, Tuple[str, float]]]
+            ] = None
+            if not cog_key:
+                if DefaultAzureCredential is None:
+                    raise typer.BadParameter(
+                        "No API key set and azure-identity is not installed. "
+                        "Install it with: pip install azure-identity"
+                    )
+                typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
+                try:
+                    _cred = DefaultAzureCredential()
+
+                    # Return (token, expires_on) so the backend refreshes on the
+                    # token's REAL expiry, not a blind wall-clock TTL. Critical
+                    # because DefaultAzureCredential often falls through to the
+                    # shared `az` CLI token, which can be handed over already
+                    # aged (<30 min life) — a fixed 30-min TTL would then let it
+                    # die mid-meeting before the scheduled refresh ever fires.
+                    def _mint_cog_token(_c=_cred):
+                        tok = _c.get_token("https://cognitiveservices.azure.com/.default")
+                        return (tok.token, float(tok.expires_on))
+
+                    _mint_cog_token()  # fail fast if credentials are unusable
+                    cog_token_provider = _mint_cog_token
+                except Exception as exc:
+                    typer.echo(f"Azure AD authentication failed: {exc}", err=True)
+                    raise typer.Exit(code=1)
+                typer.echo("Azure AD token acquired successfully.")
+
+            if backend == BACKEND_OPENAI:
+                oai_endpoint = openai_endpoint or os.environ.get("RTT_OPENAI_ENDPOINT")
+                if not oai_endpoint:
+                    raise typer.BadParameter(
+                        "The 'openai' backend requires --openai-endpoint or RTT_OPENAI_ENDPOINT "
+                        "(the Azure OpenAI resource endpoint)."
+                    )
+                typer.echo(
+                    f"Starting Azure OpenAI transcribe backend "
+                    f"(deployment={openai_deployment}, chunk={chunk_seconds:.0f}s)"
+                )
+                try:
+                    chunked_backend = OpenAITranscribeBackend(
+                        endpoint=oai_endpoint,
+                        deployment=openai_deployment,
+                        sample_rate=sample_rate,
+                        chunk_seconds=chunk_seconds,
+                        language=language,
+                        token_provider=cog_token_provider,
+                        api_key=cog_key,
+                    )
+                except Exception as exc:
+                    typer.echo(f"Failed to initialize Azure OpenAI backend: {exc}", err=True)
+                    raise typer.Exit(code=1)
+            else:  # BACKEND_LLMSPEECH
+                lls_endpoint = (
+                    llmspeech_endpoint
+                    or os.environ.get("RTT_LLMSPEECH_ENDPOINT")
+                    or os.environ.get("AZURE_SPEECH_ENDPOINT")
+                )
+                if not lls_endpoint:
+                    raise typer.BadParameter(
+                        "The 'llmspeech' backend requires --llmspeech-endpoint, "
+                        "RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT "
+                        "(the Azure Speech resource endpoint)."
+                    )
+                locales_list: Optional[List[str]] = None
+                if llmspeech_locales:
+                    locales_list = [l.strip() for l in llmspeech_locales.split(",") if l.strip()]
+                typer.echo(
+                    f"Starting Azure LLM Speech backend "
+                    f"(chunk={chunk_seconds:.0f}s, locales={locales_list or 'auto'})"
+                )
+                try:
+                    chunked_backend = LLMSpeechBackend(
+                        endpoint=lls_endpoint,
+                        sample_rate=sample_rate,
+                        chunk_seconds=chunk_seconds,
+                        locales=locales_list,
+                        token_provider=cog_token_provider,
+                        api_key=cog_key,
+                    )
+                except Exception as exc:
+                    typer.echo(f"Failed to initialize Azure LLM Speech backend: {exc}", err=True)
+                    raise typer.Exit(code=1)
+
+            worker = threading.Thread(
+                target=process_chunked_backend,
+                args=(chunked_backend, audio_queue, stop_event, paused_event, emit),
                 daemon=True,
             )
 

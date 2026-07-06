@@ -139,6 +139,72 @@ python transcribe.py --backend azure --azure-speaker-labels
 ```
 Speaker diarization currently requires the Azure backend; local Whisper mode continues to emit unlabeled lines.
 
+## Newer model backends (openai / llmspeech)
+
+Beyond the classic Speech SDK backend (`--backend azure`), RTT can transcribe with Microsoft's newer speech models over their REST APIs. These are **chunked** (micro-batch): audio is buffered into `--chunk-seconds` windows (default 10s) and POSTed per chunk, trading true real-time latency for higher model quality + native diarization.
+
+### `--backend openai` — Azure OpenAI `gpt-4o-transcribe-diarize`
+Better word error rate, native speaker diarization, ~1/3 the per-hour cost of classic Speech. Speaker labels are letters (`Speaker A`, `Speaker B`).
+```bash
+# Needs RTT_OPENAI_ENDPOINT (Azure OpenAI resource endpoint) in .env
+python transcribe.py --backend openai --chunk-seconds 10
+# or just:
+./run-openai.sh
+```
+
+### `--backend llmspeech` — Azure Speech "LLM Speech" (`enhancedMode`)
+LLM-enhanced quality with multilingual auto-detect (handles Hebrew/English code-switching) and diarization. Speaker labels are numeric (`Speaker 1`, `Speaker 2`).
+```bash
+# Needs RTT_LLMSPEECH_ENDPOINT (Azure Speech resource endpoint) in .env
+python transcribe.py --backend llmspeech --llmspeech-locales "en-US,he-IL"
+# or just:
+./run-llmspeech.sh
+```
+
+### Aliases
+| Alias | Backend |
+|---|---|
+| `rtt` | openai (gpt-4o-transcribe-diarize) — default |
+| `rttheb` | llmspeech (LLM Speech, en-US+he-IL) — default |
+| `rttold` | classic Conversation Transcriber (fallback / A/B baseline) |
+| `rtthebold` | classic continuous-LID Hebrew (true-realtime fallback) |
+
+**Auth:** Both reuse Azure AD via `DefaultAzureCredential` (fresh bearer token minted on demand, 30-min cache), or an API key if `AZURE_SPEECH_KEY` is set. The identity needs **Cognitive Services OpenAI User** (openai backend) or **Cognitive Services Speech User** (llmspeech backend) on the respective resource.
+
+**Latency vs accuracy:** larger `--chunk-seconds` = more accurate but lands further behind the speaker; smaller = more live but cuts mid-sentence and resets diarization more often. Speaker numbers are not guaranteed stable across chunks.
+
+## rtt-cli — interactive control (menu / wizard / chat)
+
+`rtt-cli` is a zero-dependency front-end for configuring and launching RTT without
+memorizing flags. It reads a single declarative schema (`config_schema.py`), so
+every option — current and future — is available in all three modes automatically.
+
+```bash
+rtt-cli                       # main menu (pick a profile, tweak, launch)
+rtt-cli --wizard              # walk through every applicable option, grouped
+rtt-cli --chat                # natural-language config
+rtt-cli --profile rttheb      # start from a profile, go to the action menu
+rtt-cli --profile rtt --launch        # validate + launch, no menu
+rtt-cli --print-argv --profile rtt    # non-interactive: print the transcribe.py args
+```
+
+**Profiles** mirror the shell aliases: `rtt` (openai diarize), `rttheb`
+(LLM Speech Hebrew/English), `rttold` / `rtthebold` (classic Speech SDK),
+`local` (offline Whisper).
+
+**Chat mode** understands plain language, e.g.:
+- `use hebrew` → llmspeech + `en-US,he-IL`
+- `switch to local whisper` → local backend
+- `chunk 8` / `faster` / `slower` → tune the chunk window
+- `add my mic` → mix your microphone in
+- `save to notes.txt` → set the output file
+- `show` / `launch` / `wizard` / `help` / `quit`
+
+**Extending it:** to add a new option, add one `Field(...)` entry to
+`config_schema.py`. It then appears in the wizard, is understood by the chat
+parser (via its `aliases`), is validated, and is emitted into the launch command —
+no UI code changes. Named configs save to `~/.config/rtt-cli/`.
+
 ## Testing with an audio file
 You can skip live capture and feed a WAV/FLAC/MP3 file using `--input-file path`. Audio is resampled to 16 kHz mono on the fly with PyAV, which keeps the pipeline identical to live capture. Combine `--skip-seconds` and `--max-seconds` to preview a slice of a long meeting recording. Use `ffmpeg` or `sox` to convert other formats if needed.
 
