@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-06 (transient-outage resilience)
+- **Fix: chunked backends survive a transient Azure outage instead of silently dropping audio.** The openai resource returned `HTTP 500 "Unable to get resource information"` for ~23 min; a fresh token still 500'd (server-side outage, not auth), so the 401 self-heal correctly didn't fire — but the old per-chunk log-and-skip dropped ~140 chunks (~23 min) with no visible signal. Discovered only by watching stderr.
+  - **Bounded transient retry:** `_post()` now retries 429/500/502/503/504 and network-level `RequestException`s up to 2× with linear backoff. A brief blip recovers instead of dropping that chunk. The 401 token-refresh is separate and does NOT consume the transient budget.
+  - **Loud health escalation:** after 3 consecutive failed chunks, ONE `⚠️ RTT BACKEND DOWN …` line is written into the transcript (not just stderr) telling you audio is dropping and to switch backend (rttheb/rttold/local). On recovery, a `⚠️ RTT RECOVERED` line + normal transcription resumes. A long outage is now visible at ~30s, not 23 min later.
+  - Escalates exactly once per outage; resets on recovery so future outages re-escalate.
+  - Tests: `tests/test_chunked_backends.py` +8 (transient retry/exhaust, 429, network-exc, 401-doesn't-eat-budget, escalate-once, recovery-announced, single-failure-no-spam). Full suite 63/63.
+  - NOT done (deliberate): automatic backend failover — has label/language/cost tradeoffs, left as a user decision; the escalation line prompts the switch.
+
 ## 2026-07-06
 - **Fix: chunked backends (`openai`/`llmspeech`) no longer die mid-meeting on AAD token expiry.** A live call was dropping ~24 min in (not 60) with a permanent `chunk failed: HTTP 401` storm that never recovered — forcing a restart that reset diarization/speaker labels. Three compounding causes: (1) `DefaultAzureCredential` falls through to the shared `az` CLI token, often handed over already-aged (<30 min life); (2) the token cache used a blind 30-min wall-clock TTL that ignored the token's real `exp`; (3) a 401 never busted the cache, so the dead token was re-sent forever.
   - **Real-expiry cache:** the AAD token provider now returns `(token, expires_on)`; the cache refreshes 5 min before actual expiry instead of a fixed TTL. Bare-string providers still supported.

@@ -42,6 +42,12 @@ from typing import Callable, List, Optional, Tuple, Union
 # A token provider returns either a bare token string or (token, expires_on_epoch).
 TokenProvider = Callable[[], Union[str, Tuple[str, float]]]
 
+# HTTP statuses worth a short bounded retry: transient server-side blips and
+# throttling. A sustained outage across these still escalates loudly (see
+# ChunkedHTTPBackend._record_failure) rather than silently dropping audio.
+# 401/403 are handled separately (token refresh), NOT here.
+_TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
+
 import numpy as np
 import requests
 import typer
@@ -85,6 +91,16 @@ class ChunkedHTTPBackend:
         self._token_ttl = 1800.0          # fallback only when expiry is unknown
         self._token_refresh_margin = 300.0
         self._token_lock = threading.Lock()
+        # Transient-failure retry + health tracking. A single blip (429/5xx) is
+        # retried in-process with short backoff so we don't drop that chunk. A
+        # SUSTAINED outage (many consecutive failures) is escalated LOUDLY into
+        # the transcript exactly once, so a 20-min backend outage can't silently
+        # masquerade as one bad chunk (as the 2026-07-06 HTTP 500 outage did).
+        self._max_transient_retries = 2      # per-chunk in-request retries
+        self._retry_backoff = 1.5            # seconds, ×attempt
+        self._consecutive_failures = 0
+        self._unhealthy = False              # True once we've escalated "DOWN"
+        self._escalate_after = 3             # consecutive failures → escalate
 
     # --- auth -------------------------------------------------------------
     def _auth_header(self, force_refresh: bool = False) -> dict:
@@ -125,35 +141,79 @@ class ChunkedHTTPBackend:
             self._token_expiry = 0.0
 
     def _post(self, *, files, data=None) -> "requests.Response":
-        """POST to self._url with AAD/key auth and one-shot 401 recovery.
+        """POST to self._url with AAD/key auth, one-shot 401 recovery, and
+        bounded retry on transient 5xx/429.
 
-        Shared by all chunked subclasses so the token-expiry recovery lives in
-        ONE place. On a 401/403 with AAD auth we invalidate the cached token,
-        force a fresh mint, and retry the chunk exactly once — turning what used
-        to be a permanent mid-meeting 401 storm into a ~10s self-heal. Payloads
-        are plain bytes/dicts, safe to re-send on the retry.
+        Shared by all chunked subclasses so recovery lives in ONE place:
+        - 401/403 (AAD): invalidate the cached token, force a fresh mint, retry
+          once — the mid-meeting token-expiry self-heal.
+        - 429/5xx: retry up to `_max_transient_retries` times with linear
+          backoff — a brief Azure blip recovers instead of dropping that chunk.
+        A file payload (BytesIO) can be consumed by the first send, so we build
+        the multipart fresh on each attempt via the passed-in bytes/dicts, which
+        are safe to re-send.
+        Returns the final Response (caller decides on non-200); a network-level
+        exception on the LAST attempt propagates to the caller.
         """
-        resp = requests.post(
-            self._url,
-            headers=self._auth_header(),
-            files=files,
-            data=data,
-            timeout=self._request_timeout,
-        )
-        if resp.status_code in (401, 403) and self._token_provider is not None:
-            typer.echo(
-                f"[{self.__class__.__name__}] auth {resp.status_code} — "
-                f"refreshing AAD token and retrying chunk",
-                err=True,
-            )
-            self._invalidate_token()
-            resp = requests.post(
-                self._url,
-                headers=self._auth_header(force_refresh=True),
-                files=files,
-                data=data,
-                timeout=self._request_timeout,
-            )
+        token_refreshed = False
+        last_exc: Optional[Exception] = None
+        resp: Optional["requests.Response"] = None
+        # total attempts = 1 initial + transient retries
+        for attempt in range(self._max_transient_retries + 1):
+            try:
+                resp = requests.post(
+                    self._url,
+                    headers=self._auth_header(),
+                    files=files,
+                    data=data,
+                    timeout=self._request_timeout,
+                )
+            except requests.RequestException as exc:
+                # Network-level failure (DNS, connection reset, read timeout) is
+                # itself transient — back off and retry, same as a 5xx.
+                last_exc = exc
+                if attempt < self._max_transient_retries:
+                    time.sleep(self._retry_backoff * (attempt + 1))
+                    continue
+                raise
+
+            # AAD token death: one forced refresh + immediate retry (does NOT
+            # consume the transient budget — it's a distinct failure mode).
+            if (
+                resp.status_code in (401, 403)
+                and self._token_provider is not None
+                and not token_refreshed
+            ):
+                typer.echo(
+                    f"[{self.__class__.__name__}] auth {resp.status_code} — "
+                    f"refreshing AAD token and retrying chunk",
+                    err=True,
+                )
+                self._invalidate_token()
+                token_refreshed = True
+                resp = requests.post(
+                    self._url,
+                    headers=self._auth_header(force_refresh=True),
+                    files=files,
+                    data=data,
+                    timeout=self._request_timeout,
+                )
+
+            # Transient server blip / throttle: back off and retry.
+            if (
+                resp.status_code in _TRANSIENT_STATUS
+                and attempt < self._max_transient_retries
+            ):
+                time.sleep(self._retry_backoff * (attempt + 1))
+                continue
+
+            return resp
+
+        # Exhausted retries on transient status — return the last response so the
+        # caller raises with the real status (feeds health tracking).
+        if last_exc is not None:
+            raise last_exc
+        assert resp is not None  # loop runs ≥1 time (_max_transient_retries ≥ 0)
         return resp
 
     # --- audio framing ----------------------------------------------------
@@ -191,7 +251,12 @@ class ChunkedHTTPBackend:
         raise NotImplementedError
 
     def transcribe_ready(self, force: bool = False) -> None:
-        """Encode + POST any ready chunk, queueing resulting lines."""
+        """Encode + POST any ready chunk, queueing resulting lines.
+
+        On failure a single chunk is never fatal, but SUSTAINED failures are
+        escalated once (see _record_failure) so a backend outage is visible in
+        the transcript instead of silently dropping minutes of audio.
+        """
         chunk = self._drain_ready_chunk(force=force)
         if chunk is None:
             return
@@ -200,11 +265,46 @@ class ChunkedHTTPBackend:
             return
         wav = self._wav_bytes(chunk, self._sample_rate)
         try:
-            for line in self._transcribe_chunk(wav):
-                if line and line.strip():
-                    self._text_queue.put(line.strip())
+            lines = self._transcribe_chunk(wav)
         except Exception as exc:  # noqa: BLE001 — a dropped chunk must not kill the run
             typer.echo(f"[{self.__class__.__name__}] chunk failed: {exc}", err=True)
+            self._record_failure(exc)
+            return
+        self._record_success()
+        for line in lines:
+            if line and line.strip():
+                self._text_queue.put(line.strip())
+
+    def _record_success(self) -> None:
+        """Reset the failure streak; announce recovery if we were unhealthy."""
+        if self._unhealthy:
+            self._text_queue.put(
+                "⚠️ RTT RECOVERED — transcription backend is responding again."
+            )
+            typer.echo(
+                f"[{self.__class__.__name__}] backend recovered after "
+                f"{self._consecutive_failures} consecutive failures",
+                err=True,
+            )
+        self._unhealthy = False
+        self._consecutive_failures = 0
+
+    def _record_failure(self, exc: Exception) -> None:
+        """Count a failed chunk; escalate LOUDLY the first time we cross the
+        consecutive-failure threshold, so a long outage can't masquerade as one
+        dropped chunk (the 2026-07-06 HTTP 500 outage dropped ~23 min silently).
+        """
+        self._consecutive_failures += 1
+        if not self._unhealthy and self._consecutive_failures >= self._escalate_after:
+            self._unhealthy = True
+            msg = (
+                f"⚠️ RTT BACKEND DOWN — {self._consecutive_failures} consecutive "
+                f"chunks failed ({type(exc).__name__}: {str(exc)[:120]}). "
+                f"Audio is being DROPPED until it recovers. "
+                f"Consider switching backend (rttheb / rttold / local)."
+            )
+            self._text_queue.put(msg)
+            typer.echo(f"[{self.__class__.__name__}] {msg}", err=True)
 
     def drain_text(self) -> List[str]:
         lines: List[str] = []

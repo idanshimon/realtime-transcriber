@@ -372,3 +372,223 @@ def test_key_auth_never_triggers_token_refresh(monkeypatch):
     # Only ONE call — no token to refresh, so no retry; and it used the key.
     assert len(calls) == 1
     assert calls[0].get("Ocp-Apim-Subscription-Key") == "secret-key"
+
+
+# --------------------------------------------------------------------------
+# Transient 5xx/429 retry + backoff (the 2026-07-06 HTTP 500 outage fix)
+# --------------------------------------------------------------------------
+
+
+def _openai_backend(api_key="dummy", **kw):
+    return OpenAITranscribeBackend(
+        endpoint="https://res.cognitiveservices.azure.com/",
+        deployment="d",
+        sample_rate=16000,
+        api_key=api_key,
+        **kw,
+    )
+
+
+def test_transient_500_retries_then_succeeds(monkeypatch):
+    """A transient 500 must be retried in-request and recover — the chunk is
+    NOT dropped when the blip clears within the retry budget."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)  # no real backoff wait
+
+    seq = [500, 500, 200]
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        code = seq[len(calls)]
+        calls.append(code)
+        if code == 200:
+            return _FakeResp(200, payload={"segments": [{"speaker": "A", "text": "back"}]})
+        return _FakeResp(code, text="InternalServerError")
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+    out = b._transcribe_chunk(b"wav")
+    assert out == ["Speaker A: back"]
+    assert calls == [500, 500, 200]  # retried twice, third succeeded
+
+
+def test_transient_500_exhausts_and_raises(monkeypatch):
+    """A sustained 500 across the whole retry budget surfaces as an error (which
+    the worker isolates) — we do NOT loop forever."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        calls.append(1)
+        return _FakeResp(500, text="still down")
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+    import pytest
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        b._transcribe_chunk(b"wav")
+    # 1 initial + 2 retries = 3 attempts, then give up
+    assert len(calls) == 3
+
+
+def test_429_is_retried(monkeypatch):
+    """429 throttle is treated as transient too."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+    seq = [429, 200]
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        code = seq[len(calls)]
+        calls.append(code)
+        if code == 200:
+            return _FakeResp(200, payload={"text": "ok"})
+        return _FakeResp(429, text="Too Many Requests")
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+    assert b._transcribe_chunk(b"wav") == ["ok"]
+    assert calls == [429, 200]
+
+
+def test_network_exception_is_retried(monkeypatch):
+    """A connection-level RequestException is transient — retried, not fatal on
+    the first hit."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        calls.append(1)
+        if len(calls) < 2:
+            raise cb.requests.ConnectionError("connection reset")
+        return _FakeResp(200, payload={"text": "recovered"})
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+    assert b._transcribe_chunk(b"wav") == ["recovered"]
+    assert len(calls) == 2
+
+
+def test_401_refresh_does_not_consume_transient_budget(monkeypatch):
+    """A 401 (token refresh) then a transient 500 (retry) must both get their
+    own recovery — the 401 handling must not eat the 5xx retry budget."""
+    import chunked_backends as cb
+
+    def provider():
+        return (f"tok{_time.time()}", _time.time() + 3600)
+
+    b = _openai_backend(api_key=None, token_provider=provider)
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+    seq = [401, 500, 200]  # 401 → refresh+retry same attempt, then 500 → retry, then ok
+    calls = []
+
+    def fake_post(url, headers=None, files=None, data=None, timeout=None):
+        code = seq[len(calls)]
+        calls.append(code)
+        if code == 200:
+            return _FakeResp(200, payload={"text": "final"})
+        return _FakeResp(code, text=str(code))
+
+    monkeypatch.setattr(cb.requests, "post", fake_post)
+    assert b._transcribe_chunk(b"wav") == ["final"]
+    assert calls == [401, 500, 200]
+
+
+# --------------------------------------------------------------------------
+# Health escalation: a sustained outage is announced LOUDLY, once
+# --------------------------------------------------------------------------
+
+
+def test_sustained_failure_escalates_once_into_transcript(monkeypatch):
+    """After N consecutive failed chunks, exactly ONE loud DOWN line is queued
+    into the transcript — a long outage can't hide as a single dropped chunk."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+
+    def always_500(url, headers=None, files=None, data=None, timeout=None):
+        return _FakeResp(500, text="down")
+
+    monkeypatch.setattr(cb.requests, "post", always_500)
+
+    # Feed 6 loud chunks worth of audio; each POST 500s through the retry budget.
+    loud = np.full(b._samples_per_chunk, 0.5, dtype=np.float32)
+    for _ in range(6):
+        b.push_audio(loud)
+        b.transcribe_ready(force=True)
+
+    out = b.drain_text()
+    down_lines = [l for l in out if "RTT BACKEND DOWN" in l]
+    assert len(down_lines) == 1  # escalated exactly once, not per-chunk
+    assert b._unhealthy is True
+    assert b._consecutive_failures >= b._escalate_after
+
+
+def test_recovery_after_outage_announced(monkeypatch):
+    """Once the backend recovers, a RECOVERED line is queued and health resets
+    so a future outage can escalate again."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+
+    state = {"down": True}
+
+    def flaky(url, headers=None, files=None, data=None, timeout=None):
+        if state["down"]:
+            return _FakeResp(500, text="down")
+        return _FakeResp(200, payload={"segments": [{"speaker": "A", "text": "hi"}]})
+
+    monkeypatch.setattr(cb.requests, "post", flaky)
+    loud = np.full(b._samples_per_chunk, 0.5, dtype=np.float32)
+
+    # Drive it unhealthy.
+    for _ in range(4):
+        b.push_audio(loud)
+        b.transcribe_ready(force=True)
+    assert b._unhealthy is True
+
+    # Backend recovers.
+    state["down"] = False
+    b.push_audio(loud)
+    b.transcribe_ready(force=True)
+
+    out = b.drain_text()
+    assert any("RTT RECOVERED" in l for l in out)
+    assert any(l == "Speaker A: hi" for l in out)
+    assert b._unhealthy is False
+    assert b._consecutive_failures == 0
+
+
+def test_single_failure_does_not_escalate(monkeypatch):
+    """One or two dropped chunks below the threshold must NOT spam a DOWN line —
+    only a sustained outage escalates."""
+    import chunked_backends as cb
+
+    b = _openai_backend()
+    monkeypatch.setattr(cb.time, "sleep", lambda *_: None)
+    calls = {"n": 0}
+
+    def two_then_ok(url, headers=None, files=None, data=None, timeout=None):
+        calls["n"] += 1
+        # First transcribe_ready: all-500 (exhausts retries → 1 failure).
+        # Second: 200.
+        if calls["n"] <= 3:
+            return _FakeResp(500, text="blip")
+        return _FakeResp(200, payload={"text": "ok"})
+
+    monkeypatch.setattr(cb.requests, "post", two_then_ok)
+    loud = np.full(b._samples_per_chunk, 0.5, dtype=np.float32)
+
+    b.push_audio(loud); b.transcribe_ready(force=True)   # 1 failure (below threshold 3)
+    b.push_audio(loud); b.transcribe_ready(force=True)   # success, resets
+    out = b.drain_text()
+    assert not any("RTT BACKEND DOWN" in l for l in out)
+    assert b._unhealthy is False
