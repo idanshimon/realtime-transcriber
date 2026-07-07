@@ -38,6 +38,11 @@ try:
 except ImportError:
     DefaultAzureCredential = None  # type: ignore
 
+try:
+    from azure.identity import AzureCliCredential
+except ImportError:
+    AzureCliCredential = None  # type: ignore
+
 from chunked_backends import (
     OpenAITranscribeBackend,
     LLMSpeechBackend,
@@ -45,6 +50,34 @@ from chunked_backends import (
 )
 
 app = typer.Typer(add_completion=False, help="Stream live audio into local or Azure speech recognizers.")
+
+
+def _build_aad_credential():
+    """Return the AAD credential used to mint cognitiveservices tokens.
+
+    When RTT_AAD_SUBSCRIPTION is set, pin token minting to that subscription via
+    AzureCliCredential(subscription=...). This is LOAD-BEARING: RTT's Azure
+    resource lives in the DEV tenant (dc617093), but the `az` CLI active context
+    frequently drifts to a CORP subscription (e.g. after msx-se-hub switches you
+    to az-corp). An unpinned DefaultAzureCredential then mints a CORP-tenant
+    token, and the DEV resource rejects it with HTTP 500 "Unable to get resource
+    information" — a cross-tenant rejection that masquerades as a server error,
+    NOT a 401. The resource has disableLocalAuth=true, so API keys are not an
+    option. Pinning the SUBSCRIPTION (not just tenant_id — that still follows the
+    active account and fails) makes RTT immune to `az` drift: no more manually
+    running `az-dev` before every launch. Proven: with az active=CORP, an
+    unpinned mint 500s while subscription=DEV returns 200.
+
+    Falls back to DefaultAzureCredential when the var is unset or AzureCliCredential
+    is unavailable, preserving prior behavior.
+    """
+    sub = os.environ.get("RTT_AAD_SUBSCRIPTION", "").strip()
+    if sub and AzureCliCredential is not None:
+        typer.echo(f"Pinning AAD token to subscription {sub[:8]}… (drift-proof)")
+        return AzureCliCredential(subscription=sub)
+    if DefaultAzureCredential is not None:
+        return DefaultAzureCredential()
+    raise RuntimeError("azure-identity is not installed.")
 
 BACKEND_LOCAL = "local"
 BACKEND_AZURE = "azure"
@@ -1247,9 +1280,9 @@ def main(
                         "Azure AD auth requires AZURE_SPEECH_RESOURCE_ID (the full ARM resource ID). "
                         "Set it in .env or pass --azure-resource-id."
                     )
-                typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
+                typer.echo("No API key found — authenticating with Azure AD...")
                 try:
-                    credential = DefaultAzureCredential()
+                    credential = _build_aad_credential()
 
                     # Reusable closure so the backend can mint a FRESH token on
                     # demand (proactive refresh + post-401 recovery). AAD tokens
@@ -1304,9 +1337,9 @@ def main(
                         "No API key set and azure-identity is not installed. "
                         "Install it with: pip install azure-identity"
                     )
-                typer.echo("No API key found — authenticating with Azure AD (DefaultAzureCredential)...")
+                typer.echo("No API key found — authenticating with Azure AD...")
                 try:
-                    _cred = DefaultAzureCredential()
+                    _cred = _build_aad_credential()
 
                     # Return (token, expires_on) so the backend refreshes on the
                     # token's REAL expiry, not a blind wall-clock TTL. Critical
