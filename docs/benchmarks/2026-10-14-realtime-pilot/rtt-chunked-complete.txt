@@ -1,0 +1,26 @@
+[01:57:38] Speaker 0: Help him, help you all, uh, primarily focused on adoption, uh, making sure you're successful. Uh, the use cases you just went through, Marcus, are fantastic.
+[01:57:38] Speaker 0: I, I work with another, uh, very large healthcare company, uh, starts with a K, and, uh, you guys are doing some fantastic work, um, so I'm
+[01:57:40] Speaker 0: Excited to be working with you, and I look forward to, uh, um, digging in.
+[01:57:40] Speaker 1: Sure. Nice to meet you, Nick.
+[01:57:40] Speaker 0: Yeah, and you know me already, Marcus. Um,
+[01:57:40] Speaker 1: Yeah.
+[01:57:40] Speaker 0: Frank, have you been plugged in already?
+[01:57:40] Speaker 1: I think we've had a brief introduction before.
+[01:57:42] Speaker 0: So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven. You probably worked with John Jozwiak at one point in time.
+[01:57:42] Speaker 1: Yeah.
+[01:57:43] Speaker 0: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. uh, I wanted to make sure
+[01:57:44] Speaker 0: sure you have met with the Azure side as well as you're working with GitHub wall to wall with Copilot and, uh, with the GitHub Enterprise Cloud Services and all. Uh, we would love to support
+[01:57:45] Speaker 0: you as, um, you are experiencing and kind of experimenting with all these use cases, specifically when it comes to like developer AI, um, tooling. So can you expand a little bit more?
+[01:57:50] Speaker 0: I think what you've suggested around, um, document intelligence, I have heard about that use case. Is that the partnership you have with Derek Higgins team, or is this the one that's been separately hosted by your team?
+[01:57:51] Speaker 0: you were, um, building this one?
+[01:57:51] Speaker 1: Um, so we, uh...
+[01:57:54] Speaker 0: I'm not sure what you... the, so what you were saying with Derek Higgins team. So I get, we had, we had another one too. I'm not sure if that...
+[01:57:55] Speaker 0: That's kind of what you're looking into. We, we, we were, so we always had, we had this plan, like, if you go back like a year ago, right, we had this plan of we're going to do this intelligent delivery platform. And
+[01:57:56] Speaker 0: You know, there there's some foundational work that needed to be done, but at the same time, there was this, um, more urgent need that they wanted to do for our
+[01:57:57] Speaker 0: Our- our government group,
+[01:57:57] Speaker 1: Ah.
+[01:57:57] Speaker 0: where they wanted to- where they had a, um, we had- they have, like, government documents that are the requirements.
+[01:57:58] Speaker 0: Uh, so it's like, you know, some 300-page PDF documents and other, you know, other documents that they have along with it, right, that are requirements of public documents
+[01:57:59] Speaker 0: from the government that, that kind of creates some of the requirements for the system. And so they wanted to create a, um, kind of a
+[01:58:00] Speaker 0: A chat chatbot RAG model for being able to interact with that document. So we did that kind of as a side project thing, and we stood up, um,
+[01:58:02] Speaker 0: Um, a solution for that, like, had had the intelligent delivery platform been in place, like, it would have just been part of that, right? But there was more of an, more of an urgent need, so we had to stand

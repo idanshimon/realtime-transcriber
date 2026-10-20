@@ -23,13 +23,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Backends
 # --------------------------------------------------------------------------
 
-BACKENDS = ["local", "azure", "openai", "llmspeech"]
+BACKENDS = ["local", "azure", "openai", "llmspeech", "mai"]
 
 BACKEND_HELP = {
     "local": "Offline faster-whisper. No cloud, no diarization. Private.",
     "azure": "Classic Speech SDK (ConversationTranscriber). Real-time streaming + Guest-N diarization + Hebrew continuous-LID.",
     "openai": "Azure OpenAI gpt-4o-transcribe-diarize (chunked). Best WER, Speaker A/B labels, ~1/3 cost. Default for `rtt`.",
     "llmspeech": "Azure Speech LLM Speech (chunked). Multilingual auto-detect (Hebrew/English), Speaker 1/2 labels. Default for `rttheb`.",
+    "mai": "Azure Speech MAI-Transcribe-2 (chunked batch). LLM-enhanced transcription + speaker diarization (Speaker 0/1). Same Speech resource as llmspeech.",
 }
 
 
@@ -104,6 +105,11 @@ class Field:
 
 FIELDS: List[Field] = [
     # ---- backend selection ----
+    Field(
+        "show_config", "--show-config", "bool", default=False,
+        help="Print resolved runtime settings and exit without capture or authentication.",
+        group="general", aliases=["show config", "inspect config"],
+    ),
     Field(
         "backend", "--backend", "choice", default="openai", choices=BACKENDS,
         help="Which transcription engine to use.", group="backend",
@@ -211,7 +217,7 @@ FIELDS: List[Field] = [
     Field(
         "chunk_seconds", "--chunk-seconds", "float", default=10.0, min=3.0, max=60.0,
         help="Chunk window (s). Smaller=more live, larger=more accurate.",
-        group="chunked", applies_to=["openai", "llmspeech"],
+        group="chunked", applies_to=["openai", "llmspeech", "mai"],
         aliases=["chunk", "chunk seconds", "chunk size", "window", "latency"],
     ),
     Field(
@@ -228,6 +234,12 @@ FIELDS: List[Field] = [
         aliases=["deployment", "openai model"],
     ),
     Field(
+        "openai_temperature", "--openai-temperature", "float", default=0.0, min=0.0, max=1.0,
+        help="Sampling temperature (openai). 0.0 = deterministic, best for jargon/numbers.",
+        group="chunked", applies_to=["openai"],
+        aliases=["temperature", "temp", "determinism"],
+    ),
+    Field(
         "llmspeech_endpoint", "--llmspeech-endpoint", "str", default=None,
         env_var="RTT_LLMSPEECH_ENDPOINT",
         help="Azure Speech resource endpoint (llmspeech backend).",
@@ -239,6 +251,27 @@ FIELDS: List[Field] = [
         help="Comma-separated locales to bias, e.g. 'en-US,he-IL'. Omit for auto-detect.",
         group="chunked", applies_to=["llmspeech"],
         aliases=["locales", "hebrew english", "languages"],
+    ),
+
+    # ---- mai (MAI-Transcribe-2 batch, chunked) ----
+    Field(
+        "mai_endpoint", "--mai-endpoint", "str", default=None,
+        env_var="RTT_MAI_ENDPOINT",
+        help="Azure Speech resource endpoint (mai backend). Defaults to the llmspeech/Speech resource.",
+        group="chunked", applies_to=["mai"],
+        aliases=["mai endpoint"],
+    ),
+    Field(
+        "mai_model", "--mai-model", "str", default="MAI-Transcribe-2",
+        help="MAI transcription model (e.g. MAI-Transcribe-2, MAI-Transcribe-1.5).",
+        group="chunked", applies_to=["mai"],
+        aliases=["mai model", "mai version"],
+    ),
+    Field(
+        "mai_locales", "--mai-locales", "str", default=None,
+        help="Comma-separated locales to bias the mai backend, e.g. 'en-US,he-IL'. Omit for auto-detect.",
+        group="chunked", applies_to=["mai"],
+        aliases=["mai locales"],
     ),
 
     # ---- file-mode testing (all backends) ----
@@ -283,6 +316,7 @@ PROFILES: Dict[str, Dict[str, Any]] = {
     "rttheb": {"backend": "llmspeech", "llmspeech_locales": "en-US,he-IL"},
     "rttold": {"backend": "azure", "azure_speaker_labels": True},
     "rtthebold": {"backend": "azure", "azure_speaker_labels": True, "azure_languages": "en-US,he-IL"},
+    "mai": {"backend": "mai", "mai_model": "MAI-Transcribe-2"},
     "local": {"backend": "local", "model_size": "base"},
 }
 
@@ -291,6 +325,7 @@ PROFILE_HELP = {
     "rttheb": "Hebrew/English — LLM Speech multilingual.",
     "rttold": "Classic Speech SDK diarize (fallback / A-B baseline).",
     "rtthebold": "Classic Hebrew continuous-LID (true-realtime fallback).",
+    "mai": "MAI-Transcribe-2 batch diarization (chunked). Available for eval; not yet a default alias.",
     "local": "Offline Whisper (private, no cloud).",
 }
 
@@ -357,6 +392,8 @@ def validate_config(cfg: Dict[str, Any]) -> List[str]:
         errors.append("openai backend needs an endpoint (--openai-endpoint or RTT_OPENAI_ENDPOINT).")
     if backend == "llmspeech" and not cfg.get("llmspeech_endpoint"):
         errors.append("llmspeech backend needs an endpoint (--llmspeech-endpoint or RTT_LLMSPEECH_ENDPOINT).")
+    if backend == "mai" and not cfg.get("mai_endpoint"):
+        errors.append("mai backend needs an endpoint (--mai-endpoint, RTT_MAI_ENDPOINT, or the Speech resource endpoint).")
     return errors
 
 

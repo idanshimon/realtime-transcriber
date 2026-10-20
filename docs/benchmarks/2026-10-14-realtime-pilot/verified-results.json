@@ -1,0 +1,40 @@
+{
+  "full_file": {
+    "audio_seconds": 1695.79,
+    "request_seconds": 20.636,
+    "speaker_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "phrases": 92,
+    "words": 4486
+  },
+  "chunked_excerpt": {
+    "source_start_seconds": 270,
+    "source_end_seconds": 450,
+    "chunk_seconds": 10,
+    "lines": 26,
+    "words": 535,
+    "speaker_ids": [
+      "0",
+      "1"
+    ],
+    "verified_issue": "Speaker IDs restart per request. Speaker 0 is assigned to multiple distinct self-introduction passages and to both sides of dialogue across chunks. No cross-chunk speaker matching exists."
+  },
+  "quality_metrics": {
+    "word_error_rate": null,
+    "diarization_error_rate": null,
+    "reason": "No human-checked transcript/speaker reference."
+  },
+  "cli_bug": {
+    "fixed": "EOF drained only two buffered chunks; now all full chunks and tail drain",
+    "regression_before": "2 requests instead of 19",
+    "tests_after": "99 passed, 1 existing urllib3/LibreSSL warning"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "_comment": "RTT vocabulary corrections. Seeded 2026-07-13 from 227 old-model (ConversationTranscriber) transcripts. Two rule kinds: 'literal' = unconditional whole-word/phrase replacement (safe only when the wrong form never occurs legitimately in your meetings). 'guarded' = replace only when one of `near` context words appears within the same line (for garbles whose wrong form IS a real word, e.g. 'fire'). Case-insensitive match; replacement casing is preserved as written here. Rebuild from real new-model transcripts as gpt-4o-transcribe-diarize garbles differ.",
+  "literal": [
+    { "wrong": "high trust", "right": "HITRUST" },
+    { "wrong": "a car", "right": "ACR" },
+    { "wrong": "m caps", "right": "MCAPS" },
+    { "wrong": "m cap", "right": "MCAPS" },
+    { "wrong": "mccaps", "right": "MCAPS" }
+  ],
+  "guarded": [
+    { "wrong": "fire", "right": "FHIR", "near": ["epic", "hl7", "interop", "interoperability", "api", "resource", "endpoint", "bundle", "hapi", "server", "data", "patient", "healthcare"], "avoid": ["rapid fire", "fire drill", "fired", "firing", "fire up", "on fire", "catch fire", "under fire", "fire alarm", "fireside"] }
+  ]
+}

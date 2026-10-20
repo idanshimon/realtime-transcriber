@@ -46,6 +46,7 @@ except ImportError:
 from chunked_backends import (
     OpenAITranscribeBackend,
     LLMSpeechBackend,
+    MAITranscribeBackend,
     process_chunked_backend,
 )
 
@@ -83,6 +84,7 @@ BACKEND_LOCAL = "local"
 BACKEND_AZURE = "azure"
 BACKEND_OPENAI = "openai"        # Azure OpenAI gpt-4o-transcribe-diarize (chunked)
 BACKEND_LLMSPEECH = "llmspeech"  # Azure Speech LLM Speech enhancedMode (chunked)
+BACKEND_MAI = "mai"              # Azure Speech MAI-Transcribe-2 enhancedMode + diarization (chunked)
 
 
 def default_transcript_path() -> Path:
@@ -1104,9 +1106,70 @@ def validate_azure_config(key: Optional[str], region: Optional[str], endpoint: O
         )
 
 
+def print_runtime_config(cfg, transcript_path: Path) -> None:
+    """Print an allowlisted view of resolved options; never dump credentials/argv."""
+    from urllib.parse import urlsplit
+
+    backend = cfg["backend"]
+    values = {"backend": backend,
+              "env_file": os.environ.get("RTT_LOADED_ENV_FILE") or "not loaded by run.sh (process environment + CLI defaults)",
+              "input": str(cfg["input_file"]) if cfg["input_file"] else (cfg["input_device"] or "system default"),
+              "sample_rate": cfg["sample_rate"],
+              "block_seconds": cfg["block_duration"],
+              "output": str(transcript_path.resolve())}
+    if cfg["input_file"]:
+        values.update(skip_seconds=cfg["skip_seconds"], max_seconds=cfg["max_seconds"])
+    else:
+        values.update(loopback=cfg["use_loopback"], include_mic=cfg["include_mic"])
+        if cfg["include_mic"]:
+            values.update(mic=cfg["mic_device"] or "system default", mic_gain=cfg["mic_gain"])
+    endpoint = None
+    if backend == BACKEND_LOCAL:
+        values.update(model=cfg["model_size"], compute=cfg["compute"], beam_size=cfg["beam_size"],
+                      language=cfg["language"] or "auto", window_seconds=cfg["window_seconds"])
+    else:
+        key = cfg["azure_key"] or os.environ.get("AZURE_SPEECH_KEY")
+        values["auth"] = "API key (hidden)" if key else "Azure AD"
+        if not key:
+            sub = os.environ.get("RTT_AAD_SUBSCRIPTION", "").strip()
+            values["aad_subscription"] = sub if sub and AzureCliCredential is not None else "unpinned (DefaultAzureCredential)"
+        if backend == BACKEND_AZURE:
+            endpoint = cfg["azure_endpoint"] or os.environ.get("AZURE_SPEECH_ENDPOINT")
+            values.update(region=cfg["azure_region"] or os.environ.get("AZURE_SPEECH_REGION") or "not set",
+                          language=cfg["azure_languages"] or cfg["language"] or "en-US",
+                          speaker_labels=cfg["azure_speaker_labels"])
+        else:
+            values["chunk_seconds"] = cfg["chunk_seconds"]
+            if backend == BACKEND_OPENAI:
+                endpoint = cfg["openai_endpoint"] or os.environ.get("RTT_OPENAI_ENDPOINT")
+                values.update(deployment=cfg["openai_deployment"], language=cfg["language"] or "auto",
+                              temperature=cfg["openai_temperature"])
+            else:
+                endpoint = (cfg["llmspeech_endpoint"] or os.environ.get("RTT_LLMSPEECH_ENDPOINT")
+                            or os.environ.get("AZURE_SPEECH_ENDPOINT"))
+                if backend == BACKEND_MAI:
+                    endpoint = cfg["mai_endpoint"] or os.environ.get("RTT_MAI_ENDPOINT") or endpoint
+                    values.update(model=cfg["mai_model"], locales=cfg["mai_locales"] or "auto")
+                else:
+                    values.update(model="LLM Speech enhancedMode", locales=cfg["llmspeech_locales"] or "auto")
+        # Strip URL userinfo, query and fragment even if a credential-bearing URL is supplied.
+        if endpoint:
+            try:
+                url = urlsplit(endpoint)
+                values["endpoint"] = f"{url.scheme}://{url.hostname}/" if url.scheme and url.hostname else "set (invalid URL hidden)"
+            except ValueError:
+                values["endpoint"] = "set (invalid URL hidden)"
+        else:
+            values["endpoint"] = "not set"
+    typer.echo("RTT configuration:")
+    for name, value in values.items():
+        typer.echo(f"  {name}: {value}")
+
+
 @app.command()
 def main(
-    backend: str = typer.Option(BACKEND_LOCAL, "--backend", help="local (Whisper) or azure"),
+    show_config: bool = typer.Option(False, "--show-config", help="Print resolved settings and exit without capture or authentication."),
+    backend: str = typer.Option(BACKEND_LOCAL, "--backend", help="local, azure, openai, llmspeech, or mai"),
     model_size: str = typer.Option("base", "--model-size", help="Whisper model size for local backend."),
     compute: str = typer.Option("auto", "--compute", help="Whisper compute type: auto, cpu, metal, cuda."),
     beam_size: int = typer.Option(1, "--beam-size", min=1, max=5, help="Beam size for decoding."),
@@ -1173,6 +1236,13 @@ def main(
         "--openai-deployment",
         help="Deployment name for the 'openai' backend.",
     ),
+    openai_temperature: float = typer.Option(
+        0.0,
+        "--openai-temperature",
+        min=0.0,
+        max=1.0,
+        help="Sampling temperature for the 'openai' backend. 0.0 = deterministic (best for jargon/numbers).",
+    ),
     llmspeech_endpoint: Optional[str] = typer.Option(
         None,
         "--llmspeech-endpoint",
@@ -1183,6 +1253,21 @@ def main(
         "--llmspeech-locales",
         help="Comma-separated locales to bias the 'llmspeech' backend, e.g. 'en-US,he-IL'. Omit for multilingual auto-detect.",
     ),
+    mai_endpoint: Optional[str] = typer.Option(
+        None,
+        "--mai-endpoint",
+        help="Azure Speech resource endpoint for the 'mai' backend (or set RTT_MAI_ENDPOINT / RTT_LLMSPEECH_ENDPOINT / AZURE_SPEECH_ENDPOINT).",
+    ),
+    mai_model: str = typer.Option(
+        "MAI-Transcribe-2",
+        "--mai-model",
+        help="MAI transcription model for the 'mai' backend (e.g. MAI-Transcribe-2, MAI-Transcribe-1.5).",
+    ),
+    mai_locales: Optional[str] = typer.Option(
+        None,
+        "--mai-locales",
+        help="Comma-separated locales to bias the 'mai' backend, e.g. 'en-US,he-IL'. Omit for auto-detect.",
+    ),
 ) -> None:
     if list_devices_flag:
         list_devices()
@@ -1191,7 +1276,15 @@ def main(
     if input_file and input_device:
         raise typer.BadParameter("Use either --input-file or --input-device, not both.")
 
+    if backend not in {BACKEND_LOCAL, BACKEND_AZURE, BACKEND_OPENAI, BACKEND_LLMSPEECH, BACKEND_MAI}:
+        raise typer.BadParameter("--backend must be 'local', 'azure', 'openai', 'llmspeech', or 'mai'.")
+    if azure_speaker_labels and backend != BACKEND_AZURE:
+        raise typer.BadParameter("--azure-speaker-labels is only valid with --backend azure.")
+
     transcript_path = output_file or default_transcript_path()
+    print_runtime_config(locals(), transcript_path)
+    if show_config:
+        raise typer.Exit()
     if output_file is None:
         typer.echo(f"Autosaving transcript to {transcript_path} (use --output-file to override).")
     transcript_buffer = TranscriptBuffer(transcript_path)
@@ -1201,11 +1294,6 @@ def main(
     paused_event = threading.Event()
     hotkey_listener = ClipboardHotkeyListener(transcript_buffer, stop_event, paused_event)
     hotkey_listener.start()
-
-    if backend not in {BACKEND_LOCAL, BACKEND_AZURE, BACKEND_OPENAI, BACKEND_LLMSPEECH}:
-        raise typer.BadParameter("--backend must be 'local', 'azure', 'openai', or 'llmspeech'.")
-    if azure_speaker_labels and backend != BACKEND_AZURE:
-        raise typer.BadParameter("--azure-speaker-labels is only valid with --backend azure.")
 
     capture_thread: Optional[threading.Thread] = None
     stream: Optional[sd.InputStream] = None
@@ -1376,43 +1464,78 @@ def main(
                         sample_rate=sample_rate,
                         chunk_seconds=chunk_seconds,
                         language=language,
+                        temperature=openai_temperature,
                         token_provider=cog_token_provider,
                         api_key=cog_key,
                     )
                 except Exception as exc:
                     typer.echo(f"Failed to initialize Azure OpenAI backend: {exc}", err=True)
                     raise typer.Exit(code=1)
-            else:  # BACKEND_LLMSPEECH
+            else:  # BACKEND_LLMSPEECH or BACKEND_MAI
                 lls_endpoint = (
                     llmspeech_endpoint
                     or os.environ.get("RTT_LLMSPEECH_ENDPOINT")
                     or os.environ.get("AZURE_SPEECH_ENDPOINT")
                 )
-                if not lls_endpoint:
-                    raise typer.BadParameter(
-                        "The 'llmspeech' backend requires --llmspeech-endpoint, "
-                        "RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT "
-                        "(the Azure Speech resource endpoint)."
+                if backend == BACKEND_MAI:
+                    mai_ep = (
+                        mai_endpoint
+                        or os.environ.get("RTT_MAI_ENDPOINT")
+                        or lls_endpoint
                     )
-                locales_list: Optional[List[str]] = None
-                if llmspeech_locales:
-                    locales_list = [l.strip() for l in llmspeech_locales.split(",") if l.strip()]
-                typer.echo(
-                    f"Starting Azure LLM Speech backend "
-                    f"(chunk={chunk_seconds:.0f}s, locales={locales_list or 'auto'})"
-                )
-                try:
-                    chunked_backend = LLMSpeechBackend(
-                        endpoint=lls_endpoint,
-                        sample_rate=sample_rate,
-                        chunk_seconds=chunk_seconds,
-                        locales=locales_list,
-                        token_provider=cog_token_provider,
-                        api_key=cog_key,
+                    if not mai_ep:
+                        raise typer.BadParameter(
+                            "The 'mai' backend requires --mai-endpoint, RTT_MAI_ENDPOINT, "
+                            "RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT "
+                            "(the Azure Speech resource endpoint)."
+                        )
+                    mai_locales_list: Optional[List[str]] = None
+                    if mai_locales:
+                        mai_locales_list = [l.strip() for l in mai_locales.split(",") if l.strip()]
+                    typer.echo(
+                        f"Starting Azure MAI transcription backend "
+                        f"(model={mai_model}, chunk={chunk_seconds:.0f}s, "
+                        f"locales={mai_locales_list or 'auto'})"
                     )
-                except Exception as exc:
-                    typer.echo(f"Failed to initialize Azure LLM Speech backend: {exc}", err=True)
-                    raise typer.Exit(code=1)
+                    try:
+                        chunked_backend = MAITranscribeBackend(
+                            endpoint=mai_ep,
+                            sample_rate=sample_rate,
+                            chunk_seconds=chunk_seconds,
+                            model=mai_model,
+                            locales=mai_locales_list,
+                            token_provider=cog_token_provider,
+                            api_key=cog_key,
+                        )
+                    except Exception as exc:
+                        typer.echo(f"Failed to initialize Azure MAI backend: {exc}", err=True)
+                        raise typer.Exit(code=1)
+                else:  # BACKEND_LLMSPEECH
+                    if not lls_endpoint:
+                        raise typer.BadParameter(
+                            "The 'llmspeech' backend requires --llmspeech-endpoint, "
+                            "RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT "
+                            "(the Azure Speech resource endpoint)."
+                        )
+                    locales_list: Optional[List[str]] = None
+                    if llmspeech_locales:
+                        locales_list = [l.strip() for l in llmspeech_locales.split(",") if l.strip()]
+                    typer.echo(
+                        f"Starting Azure LLM Speech backend "
+                        f"(chunk={chunk_seconds:.0f}s, locales={locales_list or 'auto'})"
+                    )
+                    try:
+                        chunked_backend = LLMSpeechBackend(
+                            endpoint=lls_endpoint,
+                            sample_rate=sample_rate,
+                            chunk_seconds=chunk_seconds,
+                            locales=locales_list,
+                            token_provider=cog_token_provider,
+                            api_key=cog_key,
+                        )
+                    except Exception as exc:
+                        typer.echo(f"Failed to initialize Azure LLM Speech backend: {exc}", err=True)
+                        raise typer.Exit(code=1)
 
             worker = threading.Thread(
                 target=process_chunked_backend,

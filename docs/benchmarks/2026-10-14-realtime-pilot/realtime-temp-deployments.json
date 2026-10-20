@@ -1,0 +1,377 @@
+[
+  {
+    "model": "gpt-realtime",
+    "deployment": "rttbench-gpt-realtime",
+    "created": true,
+    "error": null,
+    "readback": {
+      "etag": "\"256b884d-55fa-4de5-95d4-5688cdf3d96b\"",
+      "id": "/subscriptions/b3a032cf-f672-4071-b7c8-2bcbe087bbd0/resourceGroups/rg-rtt-speech/providers/Microsoft.CognitiveServices/accounts/rtt-transcribe-1783144256/deployments/rttbench-gpt-realtime",
+      "name": "rttbench-gpt-realtime",
+      "properties": {
+        "callRateLimit": null,
+        "capabilities": {
+          "area": "US",
+          "assistants": "false",
+          "chatCompletion": "false",
+          "completion": "false",
+          "realtime": "true"
+        },
+        "capacitySettings": null,
+        "currentCapacity": 10,
+        "dynamicThrottlingEnabled": null,
+        "model": {
+          "callRateLimit": null,
+          "format": "OpenAI",
+          "name": "gpt-realtime",
+          "publisher": null,
+          "source": null,
+          "sourceAccount": null,
+          "version": "2025-08-28"
+        },
+        "parentDeploymentName": null,
+        "provisioningState": "Succeeded",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "rateLimits": [
+          {
+            "count": 200.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "request",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          },
+          {
+            "count": 100000.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "token",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          }
+        ],
+        "scaleSettings": null,
+        "spilloverDeploymentName": null,
+        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+      },
+      "resourceGroup": "rg-rtt-speech",
+      "sku": {
+        "capacity": 10,
+        "family": null,
+        "name": "GlobalStandard",
+        "size": null,
+        "tier": null
+      },
+      "systemData": {
+        "createdAt": "2026-10-14T15:10:35.253078+00:00",
+        "createdBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "createdByType": "User",
+        "lastModifiedAt": "2026-10-14T15:10:35.253078+00:00",
+        "lastModifiedBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "lastModifiedByType": "User"
+      },
+      "tags": null,
+      "type": "Microsoft.CognitiveServices/accounts/deployments"
+    }
+  },
+  {
+    "model": "gpt-realtime-mini",
+    "deployment": "rttbench-gpt-realtime-mini",
+    "created": true,
+    "error": null,
+    "readback": {
+      "etag": "\"d834e7ea-0b2e-4b72-ad64-e04e8c00826e\"",
+      "id": "/subscriptions/b3a032cf-f672-4071-b7c8-2bcbe087bbd0/resourceGroups/rg-rtt-speech/providers/Microsoft.CognitiveServices/accounts/rtt-transcribe-1783144256/deployments/rttbench-gpt-realtime-mini",
+      "name": "rttbench-gpt-realtime-mini",
+      "properties": {
+        "callRateLimit": null,
+        "capabilities": {
+          "area": "US",
+          "assistants": "false",
+          "chatCompletion": "false",
+          "completion": "false",
+          "realtime": "true"
+        },
+        "capacitySettings": null,
+        "currentCapacity": 10,
+        "dynamicThrottlingEnabled": null,
+        "model": {
+          "callRateLimit": null,
+          "format": "OpenAI",
+          "name": "gpt-realtime-mini",
+          "publisher": null,
+          "source": null,
+          "sourceAccount": null,
+          "version": "2025-12-15"
+        },
+        "parentDeploymentName": null,
+        "provisioningState": "Succeeded",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "rateLimits": [
+          {
+            "count": 30.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "request",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          },
+          {
+            "count": 100000.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "token",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          }
+        ],
+        "scaleSettings": null,
+        "spilloverDeploymentName": null,
+        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+      },
+      "resourceGroup": "rg-rtt-speech",
+      "sku": {
+        "capacity": 10,
+        "family": null,
+        "name": "GlobalStandard",
+        "size": null,
+        "tier": null
+      },
+      "systemData": {
+        "createdAt": "2026-10-14T15:10:11.774060+00:00",
+        "createdBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "createdByType": "User",
+        "lastModifiedAt": "2026-10-14T15:10:11.774060+00:00",
+        "lastModifiedBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "lastModifiedByType": "User"
+      },
+      "tags": null,
+      "type": "Microsoft.CognitiveServices/accounts/deployments"
+    }
+  },
+  {
+    "model": "gpt-realtime-1.5",
+    "deployment": "rttbench-gpt-realtime-1.5",
+    "created": true,
+    "error": null,
+    "readback": {
+      "etag": "\"8747bba1-f1ec-4788-9781-5249c3566b37\"",
+      "id": "/subscriptions/b3a032cf-f672-4071-b7c8-2bcbe087bbd0/resourceGroups/rg-rtt-speech/providers/Microsoft.CognitiveServices/accounts/rtt-transcribe-1783144256/deployments/rttbench-gpt-realtime-1.5",
+      "name": "rttbench-gpt-realtime-1.5",
+      "properties": {
+        "callRateLimit": null,
+        "capabilities": {
+          "area": "US",
+          "assistants": "false",
+          "chatCompletion": "false",
+          "completion": "false",
+          "realtime": "true"
+        },
+        "capacitySettings": null,
+        "currentCapacity": 10,
+        "dynamicThrottlingEnabled": null,
+        "model": {
+          "callRateLimit": null,
+          "format": "OpenAI",
+          "name": "gpt-realtime-1.5",
+          "publisher": null,
+          "source": null,
+          "sourceAccount": null,
+          "version": "2026-02-23"
+        },
+        "parentDeploymentName": null,
+        "provisioningState": "Succeeded",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "rateLimits": [
+          {
+            "count": 200.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "request",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          },
+          {
+            "count": 100000.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "token",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          }
+        ],
+        "scaleSettings": null,
+        "spilloverDeploymentName": null,
+        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+      },
+      "resourceGroup": "rg-rtt-speech",
+      "sku": {
+        "capacity": 10,
+        "family": null,
+        "name": "GlobalStandard",
+        "size": null,
+        "tier": null
+      },
+      "systemData": {
+        "createdAt": "2026-10-14T15:10:38.264096+00:00",
+        "createdBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "createdByType": "User",
+        "lastModifiedAt": "2026-10-14T15:10:38.264096+00:00",
+        "lastModifiedBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "lastModifiedByType": "User"
+      },
+      "tags": null,
+      "type": "Microsoft.CognitiveServices/accounts/deployments"
+    }
+  },
+  {
+    "model": "gpt-realtime-2",
+    "deployment": "rttbench-gpt-realtime-2",
+    "created": true,
+    "error": null,
+    "readback": {
+      "etag": "\"7725b53f-9831-4012-a8ab-2107d841d9b3\"",
+      "id": "/subscriptions/b3a032cf-f672-4071-b7c8-2bcbe087bbd0/resourceGroups/rg-rtt-speech/providers/Microsoft.CognitiveServices/accounts/rtt-transcribe-1783144256/deployments/rttbench-gpt-realtime-2",
+      "name": "rttbench-gpt-realtime-2",
+      "properties": {
+        "callRateLimit": null,
+        "capabilities": {
+          "area": "US",
+          "assistants": "false",
+          "chatCompletion": "false",
+          "completion": "false",
+          "realtime": "true"
+        },
+        "capacitySettings": null,
+        "currentCapacity": 10,
+        "dynamicThrottlingEnabled": null,
+        "model": {
+          "callRateLimit": null,
+          "format": "OpenAI",
+          "name": "gpt-realtime-2",
+          "publisher": null,
+          "source": null,
+          "sourceAccount": null,
+          "version": "2026-05-06"
+        },
+        "parentDeploymentName": null,
+        "provisioningState": "Succeeded",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "rateLimits": [
+          {
+            "count": 200.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "request",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          },
+          {
+            "count": 100000.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "token",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          }
+        ],
+        "scaleSettings": null,
+        "spilloverDeploymentName": null,
+        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+      },
+      "resourceGroup": "rg-rtt-speech",
+      "sku": {
+        "capacity": 10,
+        "family": null,
+        "name": "GlobalStandard",
+        "size": null,
+        "tier": null
+      },
+      "systemData": {
+        "createdAt": "2026-10-14T15:10:41.127097+00:00",
+        "createdBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "createdByType": "User",
+        "lastModifiedAt": "2026-10-14T15:10:41.127097+00:00",
+        "lastModifiedBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "lastModifiedByType": "User"
+      },
+      "tags": null,
+      "type": "Microsoft.CognitiveServices/accounts/deployments"
+    }
+  },
+  {
+    "model": "gpt-realtime-2.1-mini",
+    "deployment": "rttbench-gpt-realtime-2.1-mini",
+    "created": true,
+    "error": null,
+    "readback": {
+      "etag": "\"70e8afa4-a1d8-4ebd-ac8b-ea17b98c92f9\"",
+      "id": "/subscriptions/b3a032cf-f672-4071-b7c8-2bcbe087bbd0/resourceGroups/rg-rtt-speech/providers/Microsoft.CognitiveServices/accounts/rtt-transcribe-1783144256/deployments/rttbench-gpt-realtime-2.1-mini",
+      "name": "rttbench-gpt-realtime-2.1-mini",
+      "properties": {
+        "callRateLimit": null,
+        "capabilities": {
+          "area": "US",
+          "assistants": "false",
+          "chatCompletion": "false",
+          "completion": "false",
+          "realtime": "true"
+        },
+        "capacitySettings": null,
+        "currentCapacity": 10,
+        "dynamicThrottlingEnabled": null,
+        "model": {
+          "callRateLimit": null,
+          "format": "OpenAI",
+          "name": "gpt-realtime-2.1-mini",
+          "publisher": null,
+          "source": null,
+          "sourceAccount": null,
+          "version": "2026-07-07"
+        },
+        "parentDeploymentName": null,
+        "provisioningState": "Succeeded",
+        "raiPolicyName": "Microsoft.DefaultV2",
+        "rateLimits": [
+          {
+            "count": 200.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "request",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          },
+          {
+            "count": 100000.0,
+            "dynamicThrottlingEnabled": null,
+            "key": "token",
+            "matchPatterns": null,
+            "minCount": null,
+            "renewalPeriod": 60.0
+          }
+        ],
+        "scaleSettings": null,
+        "spilloverDeploymentName": null,
+        "versionUpgradeOption": "OnceNewDefaultVersionAvailable"
+      },
+      "resourceGroup": "rg-rtt-speech",
+      "sku": {
+        "capacity": 10,
+        "family": null,
+        "name": "GlobalStandard",
+        "size": null,
+        "tier": null
+      },
+      "systemData": {
+        "createdAt": "2026-10-14T15:10:43.968316+00:00",
+        "createdBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "createdByType": "User",
+        "lastModifiedAt": "2026-10-14T15:10:43.968316+00:00",
+        "lastModifiedBy": "idanshimon@MngEnvMCAP356394.onmicrosoft.com",
+        "lastModifiedByType": "User"
+      },
+      "tags": null,
+      "type": "Microsoft.CognitiveServices/accounts/deployments"
+    }
+  }
+]

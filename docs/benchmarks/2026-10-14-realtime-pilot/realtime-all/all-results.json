@@ -1,0 +1,2690 @@
+[
+  {
+    "model": "gpt-realtime",
+    "deployment": "rttbench-gpt-realtime",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-08-28",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.004,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-1.5",
+    "deployment": "rttbench-gpt-realtime-1.5",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-02-23",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-mini",
+    "deployment": "rttbench-gpt-realtime-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-12-15",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 35.276,
+    "completed_responses": 2,
+    "error": null,
+    "outputs": [
+      {
+        "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven.",
+        "first_text_after_commit_s": 0.205,
+        "done_after_commit_s": 0.457,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 289,
+          "input_tokens": 228,
+          "output_tokens": 61,
+          "input_token_details": {
+            "text_tokens": 78,
+            "audio_tokens": 150,
+            "image_tokens": 0,
+            "cached_tokens": 0,
+            "cached_tokens_details": {
+              "text_tokens": 0,
+              "audio_tokens": 0,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 61,
+            "audio_tokens": 0
+          }
+        }
+      },
+      {
+        "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet...",
+        "first_text_after_commit_s": 0.547,
+        "done_after_commit_s": 0.55,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 515,
+          "input_tokens": 449,
+          "output_tokens": 66,
+          "input_token_details": {
+            "text_tokens": 149,
+            "audio_tokens": 300,
+            "image_tokens": 0,
+            "cached_tokens": 256,
+            "cached_tokens_details": {
+              "text_tokens": 128,
+              "audio_tokens": 128,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 66,
+            "audio_tokens": 0
+          }
+        }
+      }
+    ],
+    "checks": {
+      "frank_first": "A",
+      "frank_second": "A",
+      "frank_continuity": true,
+      "preceding_speaker": "A",
+      "following_speaker": "B",
+      "three_longer_voices_distinct": false
+    },
+    "events": [
+      {
+        "seconds": 3.624,
+        "type": "session.created",
+        "event_id": "event_EYuvfdyEEdPe7e2QGtC97",
+        "session": {
+          "type": "realtime",
+          "object": "realtime.session",
+          "id": "sess_EYuvc5FQMFguGuC42MQhg",
+          "model": "rttbench-gpt-realtime-mini",
+          "output_modalities": [
+            "text"
+          ],
+          "instructions": "You are a transcription service, not a participant. Transcribe only the newly supplied audio, verbatim in English. Prefix each human turn with Speaker A, Speaker B, etc. Keep the same labels for the same voices throughout this session. Do not answer the speakers or summarize. Speaker labels are your best audio-based estimate. Do not invent names.",
+          "tools": [],
+          "tool_choice": "auto",
+          "max_output_tokens": "inf",
+          "tracing": null,
+          "truncation": "auto",
+          "prompt": null,
+          "expires_at": 1791994295,
+          "audio": {
+            "input": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "transcription": null,
+              "noise_reduction": null,
+              "turn_detection": null
+            },
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy",
+              "speed": 1
+            }
+          },
+          "include": null
+        }
+      },
+      {
+        "seconds": 19.006,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuvv3E4lYBWmlqd8zIZY",
+        "previous_item_id": null,
+        "item_id": "item_EYuvfsxw4WrauueSOkLSA"
+      },
+      {
+        "seconds": 19.006,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuvvkAXUEYkMNRr2jhcV",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuvfsxw4WrauueSOkLSA",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 19.006,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuvvld5MMyuqyw1yGUr3",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuvfsxw4WrauueSOkLSA",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 19.007,
+        "type": "response.created",
+        "event_id": "event_EYuvvXxAytjr1WW4SZJkF",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuvfM2VI612YrI6v8oi4",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 19.165,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuvv2TNdSUG57phT52r9",
+        "response_id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuvveIHhPRZNNrMxn65y",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 19.166,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuvvT1QASV0DcPpGw9D4",
+        "previous_item_id": "item_EYuvfsxw4WrauueSOkLSA",
+        "item": {
+          "id": "item_EYuvveIHhPRZNNrMxn65y",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 19.166,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuvvpAzKoSHDGA6sbr3b",
+        "response_id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+        "item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 19.417,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuvvooZ6GoM29FYNTOWj",
+        "response_id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+        "item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+      },
+      {
+        "seconds": 19.417,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuvv1ETUn7chp6VBOw3b",
+        "response_id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+        "item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+        }
+      },
+      {
+        "seconds": 19.417,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuvv0uv0UV4Zi1UfNX9o",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuvveIHhPRZNNrMxn65y",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 19.418,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuvvJCdrHlIpii6EPNrG",
+        "response_id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuvveIHhPRZNNrMxn65y",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 19.418,
+        "type": "response.done",
+        "event_id": "event_EYuvv9F6fCFCZt3LIdOfE",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuvvprBtUnhhcZ9X2IJI",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuvveIHhPRZNNrMxn65y",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Frank, have you been plugged in already?  \nSpeaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuvfM2VI612YrI6v8oi4",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 289,
+            "input_tokens": 228,
+            "output_tokens": 61,
+            "input_token_details": {
+              "text_tokens": 78,
+              "audio_tokens": 150,
+              "image_tokens": 0,
+              "cached_tokens": 0,
+              "cached_tokens_details": {
+                "text_tokens": 0,
+                "audio_tokens": 0,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 61,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 34.75,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuwAUUgLo156WriqgLdo",
+        "previous_item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "item_id": "item_EYuvvnAqz5YYg3TvUcLV0"
+      },
+      {
+        "seconds": 34.751,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwAstujCFPEID8Tullj",
+        "previous_item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "item": {
+          "id": "item_EYuvvnAqz5YYg3TvUcLV0",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 34.751,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwAnXFSIMEJCRTSmn0n",
+        "previous_item_id": "item_EYuvveIHhPRZNNrMxn65y",
+        "item": {
+          "id": "item_EYuvvnAqz5YYg3TvUcLV0",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 34.751,
+        "type": "response.created",
+        "event_id": "event_EYuwAEgMdRkxsjFvUy0wx",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwAw59BBJk67Fi7BcNk",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuvfM2VI612YrI6v8oi4",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 35.258,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuwBLyS0wAGoE2FCpMDl",
+        "response_id": "resp_EYuwAw59BBJk67Fi7BcNk",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwAbbswJfAKOgzY6gWB",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 35.258,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwBQPCm0AiWjM9a1jT4",
+        "previous_item_id": "item_EYuvvnAqz5YYg3TvUcLV0",
+        "item": {
+          "id": "item_EYuwAbbswJfAKOgzY6gWB",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 35.258,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuwBt089Vj72YPfSIp0X",
+        "response_id": "resp_EYuwAw59BBJk67Fi7BcNk",
+        "item_id": "item_EYuwAbbswJfAKOgzY6gWB",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 35.26,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuwBqCWJLXqqlfC6JjjI",
+        "response_id": "resp_EYuwAw59BBJk67Fi7BcNk",
+        "item_id": "item_EYuwAbbswJfAKOgzY6gWB",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+      },
+      {
+        "seconds": 35.26,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuwBkgFpuu5T11AYryX0",
+        "response_id": "resp_EYuwAw59BBJk67Fi7BcNk",
+        "item_id": "item_EYuwAbbswJfAKOgzY6gWB",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+        }
+      },
+      {
+        "seconds": 35.26,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwB6VuPgoF2oueJygaQ",
+        "previous_item_id": "item_EYuvvnAqz5YYg3TvUcLV0",
+        "item": {
+          "id": "item_EYuwAbbswJfAKOgzY6gWB",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 35.26,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuwBxlva3qWNoithYgng",
+        "response_id": "resp_EYuwAw59BBJk67Fi7BcNk",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwAbbswJfAKOgzY6gWB",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 35.261,
+        "type": "response.done",
+        "event_id": "event_EYuwBLHl0ON3yIjMsQy6C",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwAw59BBJk67Fi7BcNk",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuwAbbswJfAKOgzY6gWB",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker A: I worked with John Jawsiak at one point in time.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet..."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuvfM2VI612YrI6v8oi4",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 515,
+            "input_tokens": 449,
+            "output_tokens": 66,
+            "input_token_details": {
+              "text_tokens": 149,
+              "audio_tokens": 300,
+              "image_tokens": 0,
+              "cached_tokens": 256,
+              "cached_tokens_details": {
+                "text_tokens": 128,
+                "audio_tokens": 128,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 66,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      }
+    ]
+  },
+  {
+    "model": "gpt-realtime-1.5",
+    "deployment": "rttbench-gpt-realtime-1.5",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-02-23",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.001,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-mini",
+    "deployment": "rttbench-gpt-realtime-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-12-15",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 16.205,
+    "completed_responses": 0,
+    "error": "WS Opening handshake has timed out",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime",
+    "deployment": "rttbench-gpt-realtime",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-08-28",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 42.629,
+    "completed_responses": 2,
+    "error": null,
+    "outputs": [
+      {
+        "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven.",
+        "first_text_after_commit_s": 0.456,
+        "done_after_commit_s": 0.943,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 295,
+          "input_tokens": 228,
+          "output_tokens": 67,
+          "input_token_details": {
+            "text_tokens": 78,
+            "audio_tokens": 150,
+            "image_tokens": 0,
+            "cached_tokens": 0,
+            "cached_tokens_details": {
+              "text_tokens": 0,
+              "audio_tokens": 0,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 67,
+            "audio_tokens": 0
+          }
+        }
+      },
+      {
+        "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure...",
+        "first_text_after_commit_s": 0.511,
+        "done_after_commit_s": 1.041,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 528,
+          "input_tokens": 455,
+          "output_tokens": 73,
+          "input_token_details": {
+            "text_tokens": 155,
+            "audio_tokens": 300,
+            "image_tokens": 0,
+            "cached_tokens": 256,
+            "cached_tokens_details": {
+              "text_tokens": 128,
+              "audio_tokens": 128,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 73,
+            "audio_tokens": 0
+          }
+        }
+      }
+    ],
+    "checks": {
+      "frank_first": "B",
+      "frank_second": "B",
+      "frank_continuity": true,
+      "preceding_speaker": "A",
+      "following_speaker": "B",
+      "three_longer_voices_distinct": false
+    },
+    "events": [
+      {
+        "seconds": 9.915,
+        "type": "session.created",
+        "event_id": "event_EYuw68raCNjVaMmcIsNx4",
+        "session": {
+          "type": "realtime",
+          "object": "realtime.session",
+          "id": "sess_EYuvyaK7pC9LOX8S4JnOi",
+          "model": "rttbench-gpt-realtime",
+          "output_modalities": [
+            "text"
+          ],
+          "instructions": "You are a transcription service, not a participant. Transcribe only the newly supplied audio, verbatim in English. Prefix each human turn with Speaker A, Speaker B, etc. Keep the same labels for the same voices throughout this session. Do not answer the speakers or summarize. Speaker labels are your best audio-based estimate. Do not invent names.",
+          "tools": [],
+          "tool_choice": "auto",
+          "max_output_tokens": "inf",
+          "tracing": null,
+          "truncation": "auto",
+          "prompt": null,
+          "expires_at": 1791994322,
+          "audio": {
+            "input": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "transcription": null,
+              "noise_reduction": null,
+              "turn_detection": null
+            },
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy",
+              "speed": 1
+            }
+          },
+          "include": null
+        }
+      },
+      {
+        "seconds": 25.342,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuwLXDczcHnv9mqhPZ4L",
+        "previous_item_id": null,
+        "item_id": "item_EYuw6TKiZThJgWyPuaIlu"
+      },
+      {
+        "seconds": 25.342,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwLJPhXKiI6T6HCjf4F",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuw6TKiZThJgWyPuaIlu",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 25.342,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwLy6zx2MoXaqNccbfj",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuw6TKiZThJgWyPuaIlu",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 25.343,
+        "type": "response.created",
+        "event_id": "event_EYuwLb1ks5xztnbG7rRvC",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuw59tIcXqYiJYYlRvCn",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 25.697,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuwLMI0SRkxk7OxtwhXh",
+        "response_id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwL2SyrznstsRsfKoDZ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 25.697,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwLF5eodeYe0s71unok",
+        "previous_item_id": "item_EYuw6TKiZThJgWyPuaIlu",
+        "item": {
+          "id": "item_EYuwL2SyrznstsRsfKoDZ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 25.697,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuwLhs0WklCRDfvHfFcD",
+        "response_id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+        "item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 26.179,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuwMv2Kqm9IxWjtTP3Z2",
+        "response_id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+        "item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+      },
+      {
+        "seconds": 26.179,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuwMsFDDkjTx1afDaTNW",
+        "response_id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+        "item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+        }
+      },
+      {
+        "seconds": 26.179,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwMWTg6TFRi5OQK863m",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuwL2SyrznstsRsfKoDZ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 26.179,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuwMsXMGFETP24L78MLO",
+        "response_id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwL2SyrznstsRsfKoDZ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 26.184,
+        "type": "response.done",
+        "event_id": "event_EYuwMWqbT9GS9vhbNOCLs",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwLiW4y6zyNe7Ax6i1w",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuwL2SyrznstsRsfKoDZ",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker A: Yeah, you know me already, Marcus.  \nSpeaker B: Yeah.  \nSpeaker A: Frank, have you been plugged in already?  \nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuw59tIcXqYiJYYlRvCn",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 295,
+            "input_tokens": 228,
+            "output_tokens": 67,
+            "input_token_details": {
+              "text_tokens": 78,
+              "audio_tokens": 150,
+              "image_tokens": 0,
+              "cached_tokens": 0,
+              "cached_tokens_details": {
+                "text_tokens": 0,
+                "audio_tokens": 0,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 67,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 41.64,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuwbUQRuPcBrnRjrVrYN",
+        "previous_item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "item_id": "item_EYuwMIYpFKWgCFa0rdZSW"
+      },
+      {
+        "seconds": 41.64,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwbj70Oqo4felyz5bVb",
+        "previous_item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "item": {
+          "id": "item_EYuwMIYpFKWgCFa0rdZSW",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 41.64,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwby336sVTYgsn4HyR9",
+        "previous_item_id": "item_EYuwL2SyrznstsRsfKoDZ",
+        "item": {
+          "id": "item_EYuwMIYpFKWgCFa0rdZSW",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 41.64,
+        "type": "response.created",
+        "event_id": "event_EYuwbfUyl3d3vBzyKZdlV",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuw59tIcXqYiJYYlRvCn",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 42.062,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuwcdIcqZapIsDwxN6B1",
+        "response_id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwbRAN1dblzVOFuFDwQ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 42.062,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwcDUsasFWVbcLuO0dM",
+        "previous_item_id": "item_EYuwMIYpFKWgCFa0rdZSW",
+        "item": {
+          "id": "item_EYuwbRAN1dblzVOFuFDwQ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 42.062,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuwcIlOhEZUn4DKbD8cv",
+        "response_id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+        "item_id": "item_EYuwbRAN1dblzVOFuFDwQ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 42.591,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuwc4VoX3JtWZRtlYwu1",
+        "response_id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+        "item_id": "item_EYuwbRAN1dblzVOFuFDwQ",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+      },
+      {
+        "seconds": 42.591,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuwcOuCqfFniuwwRqbgF",
+        "response_id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+        "item_id": "item_EYuwbRAN1dblzVOFuFDwQ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+        }
+      },
+      {
+        "seconds": 42.591,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwcrSJdp4dMNoMaAxCs",
+        "previous_item_id": "item_EYuwMIYpFKWgCFa0rdZSW",
+        "item": {
+          "id": "item_EYuwbRAN1dblzVOFuFDwQ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 42.591,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuwcikyT71bpzr7mJTLc",
+        "response_id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwbRAN1dblzVOFuFDwQ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 42.592,
+        "type": "response.done",
+        "event_id": "event_EYuwcPtIiR9DLKy5EfDU9",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwbuJZFpL7C3kcKyTDb",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuwbRAN1dblzVOFuFDwQ",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker B: I worked with John Jozwiak at one point in time.  \nSpeaker A: Yeah.  \nSpeaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure..."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuw59tIcXqYiJYYlRvCn",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 528,
+            "input_tokens": 455,
+            "output_tokens": 73,
+            "input_token_details": {
+              "text_tokens": 155,
+              "audio_tokens": 300,
+              "image_tokens": 0,
+              "cached_tokens": 256,
+              "cached_tokens_details": {
+                "text_tokens": 128,
+                "audio_tokens": 128,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 73,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      }
+    ]
+  },
+  {
+    "model": "gpt-realtime-mini",
+    "deployment": "rttbench-gpt-realtime-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-12-15",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.003,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-1.5",
+    "deployment": "rttbench-gpt-realtime-1.5",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-02-23",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 34.738,
+    "completed_responses": 2,
+    "error": null,
+    "outputs": [
+      {
+        "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven.",
+        "first_text_after_commit_s": 0.528,
+        "done_after_commit_s": 1.039,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 296,
+          "input_tokens": 228,
+          "output_tokens": 68,
+          "input_token_details": {
+            "text_tokens": 78,
+            "audio_tokens": 150,
+            "image_tokens": 0,
+            "cached_tokens": 0,
+            "cached_tokens_details": {
+              "text_tokens": 0,
+              "audio_tokens": 0,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 68,
+            "audio_tokens": 0
+          }
+        }
+      },
+      {
+        "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure...",
+        "first_text_after_commit_s": 0.447,
+        "done_after_commit_s": 1.029,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 529,
+          "input_tokens": 456,
+          "output_tokens": 73,
+          "input_token_details": {
+            "text_tokens": 156,
+            "audio_tokens": 300,
+            "image_tokens": 0,
+            "cached_tokens": 192,
+            "cached_tokens_details": {
+              "text_tokens": 64,
+              "audio_tokens": 128,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 73,
+            "audio_tokens": 0
+          }
+        }
+      }
+    ],
+    "checks": {
+      "frank_first": "B",
+      "frank_second": "B",
+      "frank_continuity": true,
+      "preceding_speaker": "A",
+      "following_speaker": "C",
+      "three_longer_voices_distinct": true
+    },
+    "events": [
+      {
+        "seconds": 1.893,
+        "type": "session.created",
+        "event_id": "event_EYuwIzw8eyo1zLHdtB2oK",
+        "session": {
+          "type": "realtime",
+          "object": "realtime.session",
+          "id": "sess_EYuwHnrKIsSBiESTP8Nmw",
+          "model": "rttbench-gpt-realtime-1.5",
+          "output_modalities": [
+            "text"
+          ],
+          "instructions": "You are a transcription service, not a participant. Transcribe only the newly supplied audio, verbatim in English. Prefix each human turn with Speaker A, Speaker B, etc. Keep the same labels for the same voices throughout this session. Do not answer the speakers or summarize. Speaker labels are your best audio-based estimate. Do not invent names.",
+          "tools": [],
+          "tool_choice": "auto",
+          "max_output_tokens": "inf",
+          "tracing": null,
+          "truncation": "auto",
+          "prompt": null,
+          "expires_at": 1791994334,
+          "audio": {
+            "input": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "transcription": null,
+              "noise_reduction": null,
+              "turn_detection": null
+            },
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy",
+              "speed": 1
+            }
+          },
+          "include": null
+        }
+      },
+      {
+        "seconds": 17.318,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuwXPQkQM6hlMojusFNb",
+        "previous_item_id": null,
+        "item_id": "item_EYuwIYhK7RWsRrkKhY63z"
+      },
+      {
+        "seconds": 17.318,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwXQZQ1iHFqbZk47ekV",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuwIYhK7RWsRrkKhY63z",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 17.318,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwXR0sIdB8DwB19VKmj",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuwIYhK7RWsRrkKhY63z",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 17.318,
+        "type": "response.created",
+        "event_id": "event_EYuwXddM1O6ZXRoKPWdfK",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwXnkZJnd96V3QdyO6k",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuwHp3xuu5JeztuRy2I1",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 17.794,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuwXT5VAlAXTxj2gpXfa",
+        "response_id": "resp_EYuwXnkZJnd96V3QdyO6k",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwXO8l1dV4idXjhecq1",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 17.794,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwX2LOououb5rrzrEEr",
+        "previous_item_id": "item_EYuwIYhK7RWsRrkKhY63z",
+        "item": {
+          "id": "item_EYuwXO8l1dV4idXjhecq1",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 17.794,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuwXdAtC1xTOn0Y6Whyo",
+        "response_id": "resp_EYuwXnkZJnd96V3QdyO6k",
+        "item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 18.304,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuwYaMSgy5kZTQ8QH6gK",
+        "response_id": "resp_EYuwXnkZJnd96V3QdyO6k",
+        "item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+      },
+      {
+        "seconds": 18.304,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuwYkgs2vymsnr0Q7OFm",
+        "response_id": "resp_EYuwXnkZJnd96V3QdyO6k",
+        "item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+        },
+        "content": {
+          "type": "text",
+          "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+        }
+      },
+      {
+        "seconds": 18.305,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwYIqDKOCOCC1DZBzvQ",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuwXO8l1dV4idXjhecq1",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 18.305,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuwYGQNHLyo0cZrAwOYl",
+        "response_id": "resp_EYuwXnkZJnd96V3QdyO6k",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwXO8l1dV4idXjhecq1",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 18.306,
+        "type": "response.done",
+        "event_id": "event_EYuwYAHiC6dZX6oZo2dvN",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwXnkZJnd96V3QdyO6k",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuwXO8l1dV4idXjhecq1",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "\r\nSpeaker A: Yeah, you know me already, Marcus.  \r\nSpeaker B: Yeah.  \r\nSpeaker A: Frank, have you been plugged in already?  \r\nSpeaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuwHp3xuu5JeztuRy2I1",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 296,
+            "input_tokens": 228,
+            "output_tokens": 68,
+            "input_token_details": {
+              "text_tokens": 78,
+              "audio_tokens": 150,
+              "image_tokens": 0,
+              "cached_tokens": 0,
+              "cached_tokens_details": {
+                "text_tokens": 0,
+                "audio_tokens": 0,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 68,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 33.716,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuwnePKUf969tX3I0chy",
+        "previous_item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "item_id": "item_EYuwY6wqAAoVJX4oAIaM7"
+      },
+      {
+        "seconds": 33.717,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwne7l3UQjUDzRWwHvu",
+        "previous_item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "item": {
+          "id": "item_EYuwY6wqAAoVJX4oAIaM7",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 33.717,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwnzn38IyPfGZcKR65B",
+        "previous_item_id": "item_EYuwXO8l1dV4idXjhecq1",
+        "item": {
+          "id": "item_EYuwY6wqAAoVJX4oAIaM7",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 33.717,
+        "type": "response.created",
+        "event_id": "event_EYuwni1bEQnYot1Du5Umk",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYuwHp3xuu5JeztuRy2I1",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 34.106,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuwoXtZGRvWyRYPuKhSN",
+        "response_id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwn2thqPCl83ea3zkre",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 34.106,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuwoZfqmF4YHurQeCAJB",
+        "previous_item_id": "item_EYuwY6wqAAoVJX4oAIaM7",
+        "item": {
+          "id": "item_EYuwn2thqPCl83ea3zkre",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": []
+        }
+      },
+      {
+        "seconds": 34.106,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuwoI3pCaJYCWObYGCAI",
+        "response_id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+        "item_id": "item_EYuwn2thqPCl83ea3zkre",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 34.682,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuwoUWKYNMHGuKB08K3K",
+        "response_id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+        "item_id": "item_EYuwn2thqPCl83ea3zkre",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+      },
+      {
+        "seconds": 34.689,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuwoPfvAlg4LcdGULTvZ",
+        "response_id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+        "item_id": "item_EYuwn2thqPCl83ea3zkre",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+        },
+        "content": {
+          "type": "text",
+          "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+        }
+      },
+      {
+        "seconds": 34.689,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuwokrfVXGPmxMFGISBm",
+        "previous_item_id": "item_EYuwY6wqAAoVJX4oAIaM7",
+        "item": {
+          "id": "item_EYuwn2thqPCl83ea3zkre",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 34.689,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuwo958SM6fVHWywUdjw",
+        "response_id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuwn2thqPCl83ea3zkre",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 34.689,
+        "type": "response.done",
+        "event_id": "event_EYuwoBPI0VljZ3bnHQgRX",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuwnKPPNpAdLDyqiEtdO",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuwn2thqPCl83ea3zkre",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "\r\nSpeaker B: I worked with John Joswiak at one point in time.  \r\nSpeaker A: Yeah.  \r\nSpeaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure..."
+                }
+              ]
+            }
+          ],
+          "conversation_id": "conv_EYuwHp3xuu5JeztuRy2I1",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "alloy"
+            }
+          },
+          "usage": {
+            "total_tokens": 529,
+            "input_tokens": 456,
+            "output_tokens": 73,
+            "input_token_details": {
+              "text_tokens": 156,
+              "audio_tokens": 300,
+              "image_tokens": 0,
+              "cached_tokens": 192,
+              "cached_tokens_details": {
+                "text_tokens": 64,
+                "audio_tokens": 128,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 73,
+              "audio_tokens": 0
+            }
+          },
+          "metadata": null
+        }
+      }
+    ]
+  },
+  {
+    "model": "gpt-realtime",
+    "deployment": "rttbench-gpt-realtime",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2025-08-28",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.002,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2",
+    "deployment": "rttbench-gpt-realtime-2",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-05-06",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.004,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2.1",
+    "deployment": "gpt-realtime-2.1",
+    "endpoint": "https://caldova-ai.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.001,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2",
+    "deployment": "rttbench-gpt-realtime-2",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-05-06",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.003,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2.1",
+    "deployment": "gpt-realtime-2.1",
+    "endpoint": "https://caldova-ai.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.003,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2.1-mini",
+    "deployment": "rttbench-gpt-realtime-2.1-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 1,
+    "audio_seconds": 30,
+    "elapsed_seconds": 50.263,
+    "completed_responses": 2,
+    "error": null,
+    "outputs": [
+      {
+        "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen.",
+        "first_text_after_commit_s": 1.085,
+        "done_after_commit_s": 1.335,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 337,
+          "input_tokens": 235,
+          "output_tokens": 102,
+          "input_token_details": {
+            "text_tokens": 85,
+            "audio_tokens": 150,
+            "image_tokens": 0,
+            "cached_tokens": 0,
+            "cached_tokens_details": {
+              "text_tokens": 0,
+              "audio_tokens": 0,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 102,
+            "audio_tokens": 0,
+            "reasoning_tokens": 47
+          }
+        }
+      },
+      {
+        "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet",
+        "first_text_after_commit_s": 1.462,
+        "done_after_commit_s": 1.746,
+        "status": "completed",
+        "usage": {
+          "total_tokens": 701,
+          "input_tokens": 450,
+          "output_tokens": 251,
+          "input_token_details": {
+            "text_tokens": 150,
+            "audio_tokens": 300,
+            "image_tokens": 0,
+            "cached_tokens": 192,
+            "cached_tokens_details": {
+              "text_tokens": 64,
+              "audio_tokens": 128,
+              "image_tokens": 0
+            }
+          },
+          "output_token_details": {
+            "text_tokens": 251,
+            "audio_tokens": 0,
+            "reasoning_tokens": 184
+          }
+        }
+      }
+    ],
+    "checks": {
+      "frank_first": "A",
+      "frank_second": "A",
+      "frank_continuity": true,
+      "preceding_speaker": "A",
+      "following_speaker": "B",
+      "three_longer_voices_distinct": false
+    },
+    "events": [
+      {
+        "seconds": 16.556,
+        "type": "session.created",
+        "event_id": "event_EYux5z9ZJno8hXOVFQw5J",
+        "session": {
+          "type": "realtime",
+          "object": "realtime.session",
+          "id": "sess_EYux5A1ijiycDs3RL2CyM",
+          "model": "rttbench-gpt-realtime-2.1-mini",
+          "output_modalities": [
+            "text"
+          ],
+          "instructions": "You are a transcription service, not a participant. Transcribe only the newly supplied audio, verbatim in English. Prefix each human turn with Speaker A, Speaker B, etc. Keep the same labels for the same voices throughout this session. Do not answer the speakers or summarize. Speaker labels are your best audio-based estimate. Do not invent names.",
+          "tools": [],
+          "tool_choice": "auto",
+          "max_output_tokens": "inf",
+          "tracing": null,
+          "truncation": "auto",
+          "prompt": null,
+          "expires_at": 1791994383,
+          "audio": {
+            "input": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "transcription": null,
+              "noise_reduction": null,
+              "turn_detection": null
+            },
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "marin",
+              "speed": 1
+            }
+          },
+          "include": null
+        }
+      },
+      {
+        "seconds": 32.187,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuxLr0delcXjIad72JDW",
+        "previous_item_id": null,
+        "item_id": "item_EYux5I3iBU8iNIjMrY3aB"
+      },
+      {
+        "seconds": 32.187,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuxLQeD4QqrV1iG8YzTL",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYux5I3iBU8iNIjMrY3aB",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 32.187,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuxLRlCJQc18AvTGjL8P",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYux5I3iBU8iNIjMrY3aB",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 32.187,
+        "type": "response.created",
+        "event_id": "event_EYuxLpVepPpO0lTrFqKhL",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuxLT93EfmcaSxVfBEdp",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYux5ZDEwjk9QYu9SHuAh",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "marin"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 32.939,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuxLlraSmPJLzX9t6YrD",
+        "response_id": "resp_EYuxLT93EfmcaSxVfBEdp",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuxLW0rJNoW752A9sMHQ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": [],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 32.939,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuxL7xzb6BO6gigsQHih",
+        "previous_item_id": "item_EYux5I3iBU8iNIjMrY3aB",
+        "item": {
+          "id": "item_EYuxLW0rJNoW752A9sMHQ",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": [],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 32.939,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuxLZOmfsuDD4DT5VrLY",
+        "response_id": "resp_EYuxLT93EfmcaSxVfBEdp",
+        "item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 33.188,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuxMLPTlD70vbQCX4Ume",
+        "response_id": "resp_EYuxLT93EfmcaSxVfBEdp",
+        "item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+      },
+      {
+        "seconds": 33.188,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuxMn45z2zX6PkitmY6k",
+        "response_id": "resp_EYuxLT93EfmcaSxVfBEdp",
+        "item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+        }
+      },
+      {
+        "seconds": 33.188,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuxMLP1CLE940DGKvPwX",
+        "previous_item_id": null,
+        "item": {
+          "id": "item_EYuxLW0rJNoW752A9sMHQ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+            }
+          ],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 33.189,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuxM3VmizNPDRWupQOC6",
+        "response_id": "resp_EYuxLT93EfmcaSxVfBEdp",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuxLW0rJNoW752A9sMHQ",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+            }
+          ],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 33.19,
+        "type": "response.done",
+        "event_id": "event_EYuxMC14wZl3oh8kaQL3u",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuxLT93EfmcaSxVfBEdp",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuxLW0rJNoW752A9sMHQ",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen."
+                }
+              ],
+              "phase": "final_answer"
+            }
+          ],
+          "conversation_id": "conv_EYux5ZDEwjk9QYu9SHuAh",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "marin"
+            }
+          },
+          "usage": {
+            "total_tokens": 337,
+            "input_tokens": 235,
+            "output_tokens": 102,
+            "input_token_details": {
+              "text_tokens": 85,
+              "audio_tokens": 150,
+              "image_tokens": 0,
+              "cached_tokens": 0,
+              "cached_tokens_details": {
+                "text_tokens": 0,
+                "audio_tokens": 0,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 102,
+              "audio_tokens": 0,
+              "reasoning_tokens": 47
+            }
+          },
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 48.542,
+        "type": "input_audio_buffer.committed",
+        "event_id": "event_EYuxbLBXisrh4X5uogIFM",
+        "previous_item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "item_id": "item_EYuxMZXQZjnj1GacT7Gxq"
+      },
+      {
+        "seconds": 48.543,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuxbtyiN2XGZIHJTCTUX",
+        "previous_item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "item": {
+          "id": "item_EYuxMZXQZjnj1GacT7Gxq",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 48.543,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuxbScTFObjecY6ZinRc",
+        "previous_item_id": "item_EYuxLW0rJNoW752A9sMHQ",
+        "item": {
+          "id": "item_EYuxMZXQZjnj1GacT7Gxq",
+          "type": "message",
+          "status": "completed",
+          "role": "user",
+          "content": [
+            {
+              "type": "input_audio",
+              "transcript": null
+            }
+          ]
+        }
+      },
+      {
+        "seconds": 48.544,
+        "type": "response.created",
+        "event_id": "event_EYuxbupyKKr0ZuFusMR5R",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+          "status": "in_progress",
+          "status_details": null,
+          "output": [],
+          "conversation_id": "conv_EYux5ZDEwjk9QYu9SHuAh",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "marin"
+            }
+          },
+          "usage": null,
+          "metadata": null
+        }
+      },
+      {
+        "seconds": 49.969,
+        "type": "response.output_item.added",
+        "event_id": "event_EYuxcOjQtNlgO9Uk8Tila",
+        "response_id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuxb2eRayitw9vCRT4Gk",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": [],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 49.969,
+        "type": "conversation.item.added",
+        "event_id": "event_EYuxcBBq2uKidtoPjl49t",
+        "previous_item_id": "item_EYuxMZXQZjnj1GacT7Gxq",
+        "item": {
+          "id": "item_EYuxb2eRayitw9vCRT4Gk",
+          "type": "message",
+          "status": "in_progress",
+          "role": "assistant",
+          "content": [],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 49.969,
+        "type": "response.content_part.added",
+        "event_id": "event_EYuxcJESXHPuMGiKkclRt",
+        "response_id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+        "item_id": "item_EYuxb2eRayitw9vCRT4Gk",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": ""
+        },
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "seconds": 50.254,
+        "type": "response.output_text.done",
+        "event_id": "event_EYuxdHZPhSsqaBd88iuVV",
+        "response_id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+        "item_id": "item_EYuxb2eRayitw9vCRT4Gk",
+        "output_index": 0,
+        "content_index": 0,
+        "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+      },
+      {
+        "seconds": 50.254,
+        "type": "response.content_part.done",
+        "event_id": "event_EYuxdXHW9GOzT2oj5Bvyv",
+        "response_id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+        "item_id": "item_EYuxb2eRayitw9vCRT4Gk",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {
+          "type": "text",
+          "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+        },
+        "content": {
+          "type": "text",
+          "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+        }
+      },
+      {
+        "seconds": 50.254,
+        "type": "conversation.item.done",
+        "event_id": "event_EYuxdqOeV6KHpAa18dvsC",
+        "previous_item_id": "item_EYuxMZXQZjnj1GacT7Gxq",
+        "item": {
+          "id": "item_EYuxb2eRayitw9vCRT4Gk",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+            }
+          ],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 50.254,
+        "type": "response.output_item.done",
+        "event_id": "event_EYuxd2Hp1TWDmv0BSY5Xz",
+        "response_id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+        "output_index": 0,
+        "item": {
+          "id": "item_EYuxb2eRayitw9vCRT4Gk",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+            }
+          ],
+          "phase": "final_answer"
+        }
+      },
+      {
+        "seconds": 50.254,
+        "type": "response.done",
+        "event_id": "event_EYuxdefJn0jD5Ax1jyht7",
+        "response": {
+          "object": "realtime.response",
+          "id": "resp_EYuxbaFjbTGyLvXOIxl6O",
+          "status": "completed",
+          "status_details": null,
+          "output": [
+            {
+              "id": "item_EYuxb2eRayitw9vCRT4Gk",
+              "type": "message",
+              "status": "completed",
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Speaker A: I worked with John Jawswiak at one point in time. \n\nSpeaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet"
+                }
+              ],
+              "phase": "final_answer"
+            }
+          ],
+          "conversation_id": "conv_EYux5ZDEwjk9QYu9SHuAh",
+          "output_modalities": [
+            "text"
+          ],
+          "max_output_tokens": "inf",
+          "audio": {
+            "output": {
+              "format": {
+                "type": "audio/pcm",
+                "rate": 24000
+              },
+              "voice": "marin"
+            }
+          },
+          "usage": {
+            "total_tokens": 701,
+            "input_tokens": 450,
+            "output_tokens": 251,
+            "input_token_details": {
+              "text_tokens": 150,
+              "audio_tokens": 300,
+              "image_tokens": 0,
+              "cached_tokens": 192,
+              "cached_tokens_details": {
+                "text_tokens": 64,
+                "audio_tokens": 128,
+                "image_tokens": 0
+              }
+            },
+            "output_token_details": {
+              "text_tokens": 251,
+              "audio_tokens": 0,
+              "reasoning_tokens": 184
+            }
+          },
+          "metadata": null
+        }
+      }
+    ]
+  },
+  {
+    "model": "gpt-realtime-2.1",
+    "deployment": "gpt-realtime-2.1",
+    "endpoint": "https://caldova-ai.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.003,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2",
+    "deployment": "rttbench-gpt-realtime-2",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-05-06",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 33.467,
+    "completed_responses": 0,
+    "error": "WS Opening handshake has timed out",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2.1-mini",
+    "deployment": "rttbench-gpt-realtime-2.1-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 2,
+    "audio_seconds": 30,
+    "elapsed_seconds": 20.003,
+    "completed_responses": 0,
+    "error": "The operation was aborted due to timeout",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  },
+  {
+    "model": "gpt-realtime-2.1-mini",
+    "deployment": "rttbench-gpt-realtime-2.1-mini",
+    "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+    "version": "2026-07-07",
+    "rep": 3,
+    "audio_seconds": 30,
+    "elapsed_seconds": 30.552,
+    "completed_responses": 0,
+    "error": "WS Opening handshake has timed out",
+    "outputs": [],
+    "checks": {
+      "frank_first": null,
+      "frank_second": null,
+      "frank_continuity": null,
+      "preceding_speaker": null,
+      "following_speaker": null,
+      "three_longer_voices_distinct": null
+    },
+    "events": []
+  }
+]

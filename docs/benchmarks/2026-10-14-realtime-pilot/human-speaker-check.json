@@ -1,0 +1,10 @@
+{
+  "clip": "speaker-boundary-05m00s-05m25s.mp3",
+  "source_start_seconds": 300,
+  "verification": "User listened to the clip and identified Frank; clarified another person speaks approximately 1–8 seconds into the clip.",
+  "annotations": [
+    {"clip_interval_seconds_approx": [1, 8], "speaker": "another person", "precision": "approximate user description; not exact turn boundaries"},
+    {"clip_time_seconds": 15, "speaker": "Frank", "event": "Continues from 'You probably' to 'worked with John'; MAI request-local label changes from 1 to 0 at chunk boundary.", "precision": "Speaker identity user-confirmed; boundary timing from request framing and model word timestamps"}
+  ],
+  "scope": "Does not label all speakers or all 25 seconds. Not a complete diarization ground truth."
+}

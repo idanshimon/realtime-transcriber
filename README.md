@@ -63,6 +63,25 @@ cp .env.example .env   # then edit
 ```
 
 ## Usage
+
+Every transcription run prints a resolved configuration summary before capture/authentication.
+To inspect the same settings without recording, authenticating, or creating a transcript:
+
+```bash
+rtt --show-config
+rtt --show-config --chunk-seconds 8 --language he
+```
+
+`rtt` is a shell alias for `run-openai.sh`, which selects `--backend openai`
+and calls `run.sh`. That wrapper loads the repo-local `.env` (overriding matching
+inherited environment values); explicit CLI flags override the supported environment
+fallbacks, then built-in defaults apply. A plain `rtt` does not load a saved
+`rtt-cli` profile. The summary shows the loaded `.env` path, backend/model,
+language/locales, chunk/window settings, audio inputs/mic, auth mode/subscription,
+endpoint and output path. API keys/tokens and URL credentials are never printed.
+`--show-config` reports configured device selectors without opening audio devices;
+the timestamped output path is prospective and no file is created.
+
 List devices:
 ```bash
 source .venv/bin/activate
@@ -161,6 +180,17 @@ python transcribe.py --backend llmspeech --llmspeech-locales "en-US,he-IL"
 ./run-llmspeech.sh
 ```
 
+### `--backend mai` — Azure Speech **MAI-Transcribe-2** (batch, diarization)
+Microsoft's MAI transcription model with LLM-enhanced quality **and speaker diarization**, reached on the SAME fast-transcription REST surface as `llmspeech` (same Speech resource `rttspeech1763582903`). Speaker labels are numeric (`Speaker 0`, `Speaker 1`). The request sends `enhancedMode{model:"MAI-Transcribe-2"}` + `diarization{enabled:true}` with **no** `maxSpeakers` (MAI rejects it with HTTP 400). Available for evaluation — not yet a default alias.
+```bash
+# Needs an Azure Speech endpoint: RTT_MAI_ENDPOINT, RTT_LLMSPEECH_ENDPOINT, or AZURE_SPEECH_ENDPOINT
+python transcribe.py --backend mai --chunk-seconds 15
+# or just:
+./run-mai.sh
+# pick a different MAI model:
+python transcribe.py --backend mai --mai-model MAI-Transcribe-1.5
+```
+
 ### Aliases
 | Alias | Backend |
 |---|---|
@@ -168,6 +198,7 @@ python transcribe.py --backend llmspeech --llmspeech-locales "en-US,he-IL"
 | `rttheb` | llmspeech (LLM Speech, en-US+he-IL) — default |
 | `rttold` | classic Conversation Transcriber (fallback / A/B baseline) |
 | `rtthebold` | classic continuous-LID Hebrew (true-realtime fallback) |
+| `run-mai.sh` | mai (MAI-Transcribe-2 batch diarization) — eval, no alias repoint yet |
 
 **Auth:** Both reuse Azure AD via `DefaultAzureCredential` (fresh bearer token minted on demand, 30-min cache), or an API key if `AZURE_SPEECH_KEY` is set. The identity needs **Cognitive Services OpenAI User** (openai backend) or **Cognitive Services Speech User** (llmspeech backend) on the respective resource.
 

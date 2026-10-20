@@ -52,6 +52,8 @@ import numpy as np
 import requests
 import typer
 
+from corrections import Corrections
+
 
 class ChunkedHTTPBackend:
     """Base class: buffers audio into fixed-duration chunks and POSTs each.
@@ -101,6 +103,10 @@ class ChunkedHTTPBackend:
         self._consecutive_failures = 0
         self._unhealthy = False              # True once we've escalated "DOWN"
         self._escalate_after = 3             # consecutive failures → escalate
+        # Vocabulary corrections applied to each emitted line (domain-term
+        # de-garbling, e.g. "high trust" → "HITRUST"). Loaded from
+        # corrections.json; fails open to a no-op if absent/unparseable.
+        self._corrections = Corrections.load()
 
     # --- auth -------------------------------------------------------------
     def _auth_header(self, force_refresh: bool = False) -> dict:
@@ -273,7 +279,7 @@ class ChunkedHTTPBackend:
         self._record_success()
         for line in lines:
             if line and line.strip():
-                self._text_queue.put(line.strip())
+                self._text_queue.put(self._corrections.apply(line.strip()))
 
     def _record_success(self) -> None:
         """Reset the failure streak; announce recovery if we were unhealthy."""
@@ -337,6 +343,7 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
         chunk_seconds: float = 10.0,
         api_version: str = "2024-10-21",
         language: Optional[str] = None,
+        temperature: Optional[float] = 0.0,
         token_provider: Optional["TokenProvider"] = None,
         api_key: Optional[str] = None,
     ) -> None:
@@ -348,6 +355,7 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
         )
         self._deployment = deployment
         self._language = language
+        self._temperature = temperature
 
     def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
         files = {"file": ("chunk.wav", wav_bytes, "audio/wav")}
@@ -359,6 +367,9 @@ class OpenAITranscribeBackend(ChunkedHTTPBackend):
             # NOTE: the diarize model is documented to sometimes ignore
             # `language` on the realtime path; on this batch path it is honored.
             data["language"] = self._language
+        if self._temperature is not None:
+            # Pin determinism for jargon/number-heavy speech.
+            data["temperature"] = str(self._temperature)
         resp = self._post(files=files, data=data)
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
@@ -420,15 +431,26 @@ class LLMSpeechBackend(ChunkedHTTPBackend):
         self._max_speakers = max_speakers
         self._locales = locales  # e.g. ["en-US","he-IL"] to bias; None = auto
 
-    def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
-        import json as _json
+    def _build_definition(self) -> dict:
+        """Build the fast-transcription `definition` payload.
 
+        Extracted so subclasses (e.g. MAITranscribeBackend) can select a model
+        and change the diarization shape without reimplementing the POST. The
+        classic LLM Speech path enables enhancedMode with NO model selection and
+        a bounded maxSpeakers.
+        """
         definition: dict = {
             "enhancedMode": {"enabled": True, "task": "transcribe"},
             "diarization": {"maxSpeakers": self._max_speakers, "enabled": True},
         }
         if self._locales:
             definition["locales"] = self._locales
+        return definition
+
+    def _transcribe_chunk(self, wav_bytes: bytes) -> List[str]:
+        import json as _json
+
+        definition = self._build_definition()
         files = {
             "audio": ("chunk.wav", wav_bytes, "audio/wav"),
             "definition": (None, _json.dumps(definition)),
@@ -464,6 +486,73 @@ class LLMSpeechBackend(ChunkedHTTPBackend):
                     out.append(t)
             return out
         return []
+
+
+class MAITranscribeBackend(LLMSpeechBackend):
+    """Azure Speech fast-transcription with the MAI-Transcribe-2 model.
+
+    MAI-Transcribe-2 is the diarization-capable Microsoft AI transcription model
+    reachable on the SAME REST surface as LLM Speech
+    (/speechtotext/transcriptions:transcribe). It differs from the stock LLM
+    Speech path in exactly two ways, both verified empirically against the DEV
+    Speech resource (HTTP 200, phrases[].speaker=0 on real audio):
+
+      * enhancedMode selects the model explicitly:
+          {"enabled": true, "task": "transcribe", "model": "MAI-Transcribe-2"}
+      * diarization is {"enabled": true} with NO maxSpeakers — MAI rejects
+        maxSpeakers with HTTP 400 "maxSpeakers is not supported for MAI
+        transcription yet."
+
+    Everything else — chunk framing, bare-bearer/key auth, the 401 self-heal,
+    transient-retry + loud escalation, and the phrases[] → "Speaker N: text"
+    formatter — is inherited unchanged. Because it is a chunked HTTP backend it
+    runs through `process_chunked_backend`, whose stop path is already bounded
+    (per-request `request_timeout` + final-partial flush), so there is no
+    unbounded SDK drain to worry about.
+
+    This is the new engine behind the `rtt`/`mai` path once its alias is
+    repointed; `llmspeech` (rttheb) and `azure` (rttold) are untouched.
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        sample_rate: int,
+        chunk_seconds: float = 10.0,
+        api_version: str = "2025-10-15",
+        model: str = "MAI-Transcribe-2",
+        locales: Optional[List[str]] = None,
+        token_provider: Optional["TokenProvider"] = None,
+        api_key: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            endpoint=endpoint,
+            sample_rate=sample_rate,
+            chunk_seconds=chunk_seconds,
+            api_version=api_version,
+            locales=locales,
+            token_provider=token_provider,
+            api_key=api_key,
+        )
+        self._model = model
+
+    def _build_definition(self) -> dict:
+        """MAI definition: select the model, enable diarization, OMIT maxSpeakers.
+
+        Omitting maxSpeakers is load-bearing — the service returns HTTP 400
+        "maxSpeakers is not supported for MAI transcription yet." if it is sent.
+        """
+        definition: dict = {
+            "enhancedMode": {
+                "enabled": True,
+                "task": "transcribe",
+                "model": self._model,
+            },
+            "diarization": {"enabled": True},
+        }
+        if self._locales:
+            definition["locales"] = self._locales
+        return definition
 
 
 def process_chunked_backend(
@@ -503,11 +592,12 @@ def process_chunked_backend(
                 for line in backend.drain_text():
                     emit(line)
                 last_poll = time.time()
-        # End of stream: flush remaining full chunks + the final partial one.
-        backend.transcribe_ready(force=False)
-        backend.transcribe_ready(force=True)
-        for line in backend.drain_text():
-            emit(line)
+        # Fast file input can leave MANY chunks buffered at EOF. Each call
+        # consumes only one chunk, including force=True; drain all of them.
+        while backend._buffer.size:
+            backend.transcribe_ready(force=True)
+            for line in backend.drain_text():
+                emit(line)
     except Exception as exc:  # noqa: BLE001
         typer.echo(f"Chunked backend worker failed: {exc}", err=True)
         stop_event.set()

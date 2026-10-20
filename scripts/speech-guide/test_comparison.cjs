@@ -1,0 +1,18 @@
+const {chromium}=require('/Users/idanshimon/projects/content-creator/studio-ui/node_modules/playwright-core');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});try{const p=await b.newPage({viewport:{width:1440,height:1000}});await p.context().setOffline(true);const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('file:///Users/idanshimon/projects/ai/rtt/docs/speech-model-comparison.html');
+ assert.equal(await p.locator('#model-search').count(),1,'search control missing');
+ await p.locator('#model-search').fill('gpt-realtime-2.1');assert.equal(await p.locator('#model-table [data-model]:visible').count(),2);
+ await p.locator('#model-reset').click();assert.equal(await p.locator('#model-table [data-model]:visible').count(),22);
+ await p.locator('#tested-filter').selectOption('pilot');assert.equal(await p.locator('#model-table [data-model]:visible').count(),6);
+ await p.locator('#speaker-filter').selectOption('native');assert.equal(await p.locator('#model-table [data-model]:visible').count(),0);assert.equal(await p.locator('#model-empty').isVisible(),true);
+ await p.locator('#model-reset').click();await p.locator('#category-filter').selectOption('azure-speech');assert.equal(await p.locator('#model-table [data-model]:visible').count(),4);
+ await p.locator('#model-reset').click();await p.locator('#stream-filter').selectOption('live');assert.ok(await p.locator('#model-table [data-model]:visible').count()>6);
+ await p.locator('#model-reset').click();await p.locator('#model-table [data-sort="cost"]').click();assert.equal(await p.locator('#sort-notice').isVisible(),true);assert.equal(await p.locator('#model-table [data-model]:visible').count(),22);
+ await p.locator('#cost-unit-filter').selectOption('audio-hour');await p.locator('#model-table [data-sort="cost"]').click();assert.equal(await p.locator('#model-table [data-model]:visible').first().getAttribute('data-model'),'mai-transcribe-2');
+ await p.locator('#model-reset').click();await p.locator('#model-table [data-sort="model"]').click();let names=await p.locator('#model-table [data-model]:visible').evaluateAll(xs=>xs.map(x=>x.dataset.model));assert.deepEqual(names,[...names].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})));
+ await p.locator('#result-table [data-sort="latency"]').click();assert.equal(await p.locator('#result-table tbody tr:visible').first().getAttribute('data-model'),'gpt-realtime-mini');
+ await p.locator('#result-table [data-sort="continuity"]').click();await p.locator('#result-table [data-sort="continuity"]').click();assert.equal(await p.locator('#result-table tbody tr:visible').last().getAttribute('data-model'),'gpt-realtime-2.1-mini');
+ await p.locator('#bench-search').fill('1.5');assert.equal(await p.locator('#result-table tbody tr:visible').count(),1);await p.locator('#bench-reset').click();assert.equal(await p.locator('#result-table tbody tr:visible').count(),6);
+ assert.deepEqual(errors,[]);await p.setViewportSize({width:390,height:844});assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth),390);await p.screenshot({path:'/Users/idanshimon/.hermes/cache/scratch/speech-comparison-filter-mobile.png'});await p.setViewportSize({width:1440,height:1000});await p.locator('#models').scrollIntoViewIfNeeded();await p.screenshot({path:'/Users/idanshimon/.hermes/cache/scratch/speech-comparison-filter-desktop.png'});console.log('PASS: search, combined filters, empty state, reset, numeric score/latency sort, unit-safe cost sort, 22/6 counts, offline/mobile, no page errors');
+ }finally{await b.close();}})().catch(e=>{console.error(e);process.exit(1)});

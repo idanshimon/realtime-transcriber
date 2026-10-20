@@ -1,0 +1,70 @@
+[
+  {
+    "file": "realtime-comparison-rubric.md",
+    "sha256": "7eec5db26754ad047166a987978a619f2ee18594c2cde6cdf446292555cbe4a1"
+  },
+  {
+    "file": "realtime-comparison-results.txt",
+    "sha256": "b9b4f67c5c2e1364c4ded4a11bfdae46570b25ffda424c300ac71d6c81c2d71e"
+  },
+  {
+    "file": "realtime-comparison-summary.json",
+    "sha256": "1a290c110bd70694a7623308cba0e7059b061f39ac11a849c9d86a0cee16e50b"
+  },
+  {
+    "file": "realtime-cleanup.json",
+    "sha256": "cc66eb387b994ab6dbd736a20dcfcfe1df521444806acb0d6b753e7dec3d88ae"
+  },
+  {
+    "file": "realtime-temp-deployments.json",
+    "sha256": "184c35d69021c0974df0009966a10107afbda7b9947b54aef02fc59bc6af5145"
+  },
+  {
+    "file": "human-speaker-check.json",
+    "sha256": "17b83a3850f0c1e772cc937fd92b760cdedfd882832a62d057e389cdbefb1200"
+  },
+  {
+    "file": "realtime-all-benchmark.cjs",
+    "sha256": "c3135e89bb8b2a6fd00695393ba8ee853f687297e104793af8a1c5e603cb2e13"
+  },
+  {
+    "file": "realtime-direct-benchmark.cjs",
+    "sha256": "b6f3abc62123efcc46e69315d99fa287209d64a67076cb82610644e20fdebb58"
+  },
+  {
+    "file": "realtime-all/fixture.json",
+    "sha256": "f51e7b7eeaa7b01060453da6c333b613fe693004cf02b79aafdd7914ab3e6f58"
+  },
+  {
+    "file": "realtime-all/all-results.json",
+    "sha256": "3a8dc160b3b9e2631c812ee719144aa8f7f655c2f22be4abdec976d5125d5b3a"
+  },
+  {
+    "file": "realtime-direct/fixture.json",
+    "sha256": "f51e7b7eeaa7b01060453da6c333b613fe693004cf02b79aafdd7914ab3e6f58"
+  },
+  {
+    "file": "realtime-direct/all-results.json",
+    "sha256": "8b6bea82b682c45a8a1b973e7c4ffd06733fb2306b2793422c6b2827476bc2e1"
+  },
+  {
+    "file": "chunk-size-comparison.json",
+    "sha256": "724af1e3b5bb1b94c6b0a71330f020c8e0309b59c25aee2b731c9d640f4d620e"
+  },
+  {
+    "file": "rtt-chunked-complete.txt",
+    "sha256": "8b512f952623e97a5aa7b8dfa40816be136fc7802fbd83988db42ef9d1e8d2fe"
+  },
+  {
+    "file": "rtt-chunked-15s.txt",
+    "sha256": "18860980aabd49ea315cabc72a381a41cc832d32feb4f6ff19771d6636e09e62"
+  },
+  {
+    "file": "rttold-excerpt.txt",
+    "sha256": "247ed810f2ea6f5f6b0de84ca8f9ec6fc57b3cc238c1be5e566b532488c62ddb"
+  },
+  {
+    "file": "verified-results.json",
+    "sha256": "12ad7a4d77ab905cc71ddddc79bd7e182bcd3f3b3f06fea15a8cd1d3cf1da2c1"
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "audio_sha256": "ff1f86a920b77f6b3da53f2e7ccb959163d65d79099ef1b081b82ea9fa22d034",
+  "instructions_sha256": "ed496362e66d351eb854c8fbe6da25de3d2e4328791c5ad573a7938997277328",
+  "source_start_seconds": 300,
+  "duration_seconds": 30,
+  "commit_seconds": 15,
+  "models": [
+    {
+      "model": "gpt-realtime",
+      "deployment": "rttbench-gpt-realtime",
+      "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+      "version": "2025-08-28"
+    },
+    {
+      "model": "gpt-realtime-mini",
+      "deployment": "rttbench-gpt-realtime-mini",
+      "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+      "version": "2025-12-15"
+    },
+    {
+      "model": "gpt-realtime-1.5",
+      "deployment": "rttbench-gpt-realtime-1.5",
+      "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+      "version": "2026-02-23"
+    },
+    {
+      "model": "gpt-realtime-2",
+      "deployment": "rttbench-gpt-realtime-2",
+      "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+      "version": "2026-05-06"
+    },
+    {
+      "model": "gpt-realtime-2.1-mini",
+      "deployment": "rttbench-gpt-realtime-2.1-mini",
+      "endpoint": "https://rtt-transcribe-1783144256.cognitiveservices.azure.com",
+      "version": "2026-07-07"
+    },
+    {
+      "model": "gpt-realtime-2.1",
+      "deployment": "gpt-realtime-2.1",
+      "endpoint": "https://caldova-ai.cognitiveservices.azure.com",
+      "version": "2026-07-07"
+    }
+  ],
+  "reasoning": "provider default",
+  "output": "text",
+  "native_diarization": false
+}

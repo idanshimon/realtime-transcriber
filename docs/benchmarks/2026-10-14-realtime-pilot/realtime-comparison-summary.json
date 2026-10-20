@@ -1,0 +1,107 @@
+{
+  "models": [
+    {
+      "model": "gpt-realtime",
+      "attempts": 6,
+      "completed": 2,
+      "setup_failed": 4,
+      "frank_continuity_passes": 2,
+      "three_longer_voices_distinct_passes": 0,
+      "first_text_after_commit_median_s": 0.597,
+      "first_text_after_commit_range_s": [
+        0.456,
+        18.597
+      ],
+      "successful_run_ids": [
+        "realtime-all/rep2",
+        "realtime-direct/rep2"
+      ]
+    },
+    {
+      "model": "gpt-realtime-1.5",
+      "attempts": 6,
+      "completed": 3,
+      "setup_failed": 3,
+      "frank_continuity_passes": 3,
+      "three_longer_voices_distinct_passes": 3,
+      "first_text_after_commit_median_s": 0.538,
+      "first_text_after_commit_range_s": [
+        0.447,
+        1.153
+      ],
+      "successful_run_ids": [
+        "realtime-all/rep3",
+        "realtime-direct/rep1",
+        "realtime-direct/rep3"
+      ]
+    },
+    {
+      "model": "gpt-realtime-2",
+      "attempts": 6,
+      "completed": 1,
+      "setup_failed": 5,
+      "frank_continuity_passes": 1,
+      "three_longer_voices_distinct_passes": 1,
+      "first_text_after_commit_median_s": 0.923,
+      "first_text_after_commit_range_s": [
+        0.85,
+        0.996
+      ],
+      "successful_run_ids": [
+        "realtime-direct/rep1"
+      ]
+    },
+    {
+      "model": "gpt-realtime-2.1",
+      "attempts": 6,
+      "completed": 1,
+      "setup_failed": 5,
+      "frank_continuity_passes": 1,
+      "three_longer_voices_distinct_passes": 1,
+      "first_text_after_commit_median_s": 1.256,
+      "first_text_after_commit_range_s": [
+        1.24,
+        1.273
+      ],
+      "successful_run_ids": [
+        "realtime-direct/rep2"
+      ]
+    },
+    {
+      "model": "gpt-realtime-2.1-mini",
+      "attempts": 6,
+      "completed": 2,
+      "setup_failed": 4,
+      "frank_continuity_passes": 1,
+      "three_longer_voices_distinct_passes": 0,
+      "first_text_after_commit_median_s": 1.262,
+      "first_text_after_commit_range_s": [
+        1.005,
+        1.462
+      ],
+      "successful_run_ids": [
+        "realtime-all/rep1",
+        "realtime-direct/rep2"
+      ]
+    },
+    {
+      "model": "gpt-realtime-mini",
+      "attempts": 6,
+      "completed": 1,
+      "setup_failed": 5,
+      "frank_continuity_passes": 1,
+      "three_longer_voices_distinct_passes": 0,
+      "first_text_after_commit_median_s": 0.376,
+      "first_text_after_commit_range_s": [
+        0.205,
+        0.547
+      ],
+      "successful_run_ids": [
+        "realtime-all/rep1"
+      ]
+    }
+  ],
+  "attempts": 36,
+  "completed": 10,
+  "scope": "30-second fixture, two 15s commits retained session, generated speaker labels. Setup failures are not accuracy failures. Both authentication routes retained separately in raw data."
+}

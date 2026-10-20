@@ -1,0 +1,21 @@
+{
+  "10": {
+    "lines": 26,
+    "words": 535,
+    "speaker_ids": [
+      "0",
+      "1"
+    ],
+    "final_line": "[01:58:02] Speaker 0: Um, a solution for that, like, had had the intelligent delivery platform been in place, like, it would have just been part of that, right? But there was more of an, more of an urgent need, so we had to stand"
+  },
+  "15": {
+    "lines": 19,
+    "words": 530,
+    "speaker_ids": [
+      "0",
+      "1",
+      "2"
+    ],
+    "final_line": "[02:05:00] Speaker 0: So we did that kind of as a side project thing, and we stood up, um, a solution for that. Like, had had the intelligent delivery platform been in place, like, it would have just been part of that, right? But there was more of an, more of an urgent need, so we had to stand"
+  }
+}

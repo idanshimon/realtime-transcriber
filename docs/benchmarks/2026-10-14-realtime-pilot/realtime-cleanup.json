@@ -1,0 +1,33 @@
+{
+  "deletions": [
+    {
+      "name": "rttbench-gpt-realtime",
+      "delete_exit": 0,
+      "error": null
+    },
+    {
+      "name": "rttbench-gpt-realtime-mini",
+      "delete_exit": 0,
+      "error": null
+    },
+    {
+      "name": "rttbench-gpt-realtime-1.5",
+      "delete_exit": 0,
+      "error": null
+    },
+    {
+      "name": "rttbench-gpt-realtime-2",
+      "delete_exit": 0,
+      "error": null
+    },
+    {
+      "name": "rttbench-gpt-realtime-2.1-mini",
+      "delete_exit": 0,
+      "error": null
+    }
+  ],
+  "remaining_deployments": [
+    "gpt-4o-transcribe-diarize"
+  ],
+  "benchmark_deployments_remaining": []
+}

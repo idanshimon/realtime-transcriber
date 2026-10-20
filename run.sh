@@ -7,11 +7,14 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_DIR"
 
+# Marker describes what this invocation actually loaded, not an inherited shell.
+export RTT_LOADED_ENV_FILE=""
 if [[ -f .env ]]; then
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
+  export RTT_LOADED_ENV_FILE="$REPO_DIR/.env"
 fi
 
 PY="$REPO_DIR/.venv/bin/python"

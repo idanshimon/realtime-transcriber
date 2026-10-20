@@ -1,0 +1,88 @@
+Realtime transcription pilot — same 30-second audio, two 15-second commits in one session.
+Speaker labels below are generated text, NOT native diarization metadata.
+Setup failures are retained; no full human reference transcript or WER/DER score exists.
+
+gpt-realtime
+Completed 2 of 6 attempts; setup failures 4.
+Frank continuity: 2/2 completed runs.
+Median first text after commit: 0.597 seconds.
+First successful output (not selected for best quality):
+Speaker A: Yeah, you know me already, Marcus.  
+Speaker B: Yeah.  
+Speaker A: Frank, have you been plugged in already?  
+Speaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven.
+Speaker B: I worked with John Jozwiak at one point in time.  
+Speaker A: Yeah.  
+Speaker B: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to make sure...
+
+---
+
+gpt-realtime-1.5
+Completed 3 of 6 attempts; setup failures 3.
+Frank continuity: 3/3 completed runs.
+Median first text after commit: 0.538 seconds.
+First successful output (not selected for best quality):
+
+Speaker A: Yeah, you know me already, Marcus.  
+Speaker B: Yeah.  
+Speaker A: Frank, have you been plugged in already?  
+Speaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the Solutions Engineer working alongside Steven.
+
+Speaker B: I worked with John Joswiak at one point in time.  
+Speaker A: Yeah.  
+Speaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to make sure...
+
+---
+
+gpt-realtime-2
+Completed 1 of 6 attempts; setup failures 5.
+Frank continuity: 1/1 completed runs.
+Median first text after commit: 0.923 seconds.
+First successful output (not selected for best quality):
+Speaker A: Yeah, you know me already, Marcus. Frank, have you been plugged in already?
+
+Speaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Stephen. You probably
+Speaker B: I worked with John Joswiak at one point in time, yeah.
+
+Speaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet
+
+---
+
+gpt-realtime-2.1
+Completed 1 of 6 attempts; setup failures 5.
+Frank continuity: 1/1 completed runs.
+Median first text after commit: 1.256 seconds.
+First successful output (not selected for best quality):
+Speaker A: Yeah, you know me already, Marcus. Frank, have you been plugged in already?
+Speaker B: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven. You probably...
+Speaker B: I worked with John Joswiak at one point in time. Yeah.
+Speaker C: Awesome. So I think, Marcus, the purpose of today's call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet you...
+
+---
+
+gpt-realtime-2.1-mini
+Completed 2 of 6 attempts; setup failures 4.
+Frank continuity: 1/2 completed runs.
+Median first text after commit: 1.262 seconds.
+First successful output (not selected for best quality):
+Speaker A: Yeah, you know me already, Markus. Frank, have you been plugged in already? I think we've had a brief introduction before, so yeah, if you don't know me, Frank Tomasello. I'm the solutions engineer working alongside Stephen.
+Speaker A: I worked with John Jawswiak at one point in time. 
+
+Speaker B: Awesome. So I think Markus, the purpose of today’s call was to meet you and Greg and Mark, of course. And thank you for sharing the use cases that you're working on. I wanted to meet
+
+---
+
+gpt-realtime-mini
+Completed 1 of 6 attempts; setup failures 5.
+Frank continuity: 1/1 completed runs.
+Median first text after commit: 0.376 seconds.
+First successful output (not selected for best quality):
+Speaker A: Yeah, you know me already, Marcus.  
+Speaker B: Frank, have you been plugged in already?  
+Speaker A: I think we've had a brief introduction before. So yeah, if you don't know me, Frank Tomasello, I'm the solutions engineer working alongside Steven.
+Speaker A: I worked with John Jawsiak at one point in time.  
+Speaker B: Awesome. So I think, Marcus, the purpose of today’s call was to meet you and Greg and Mark, of course, and thank you for sharing the use cases that you're working on. I wanted to meet...
+
+---
+
+Five temporary benchmark deployments were deleted and exact account readback showed only the original gpt-4o-transcribe-diarize deployment. rtt/rttold defaults unchanged.
